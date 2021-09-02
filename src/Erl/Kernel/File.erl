@@ -8,7 +8,6 @@
          writeFileImpl/4,
          closeImpl/3,
          join/2,
-         fileErrorToPurs/1,
          posixErrorToPurs/1
         ]).
 
