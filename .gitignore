@@ -1,3 +1,5 @@
 .spago
 output
 .psc-ide-port
+ebin/
+*.dump
