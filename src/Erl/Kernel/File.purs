@@ -1,0 +1,246 @@
+module Erl.Kernel.File
+  ( PosixError(..)
+  , FileError(..)
+  , FileHandle
+  , FileName(..)
+  , FileOpenMode(..)
+  , FileOutputType(..)
+  , FileDelayedWrite(..)
+  , FileReadAhead(..)
+  , Encoding(..)
+  , open
+  , read
+  , readFile
+  , write
+  , writeFile
+  , close
+  , posixErrorToPurs
+  ) where
+
+import Prelude hiding (join)
+
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
+import Effect (Effect)
+import Erl.Data.Binary (Binary)
+import Erl.Data.Binary.IOData (IOData)
+import Erl.Data.List (List)
+import Erl.Data.List as List
+import Erl.Types (class ToErl)
+import Foreign (Foreign, unsafeToForeign)
+import Prim.Row as Row
+
+data PosixError
+  = EAcces
+  | EAgain
+  | EBadf
+  | EBadmsg
+  | EBusy
+  | EDeadlk
+  | EDeadlock
+  | EDquot
+  | EExist
+  | EFault
+  | EFbig
+  | EFtype
+  | EIntr
+  | EInval
+  | EIo
+  | EIsdir
+  | ELoop
+  | EMfile
+  | EMlink
+  | EMultihop
+  | ENametoolong
+  | ENfile
+  | ENobufs
+  | ENodev
+  | ENolck
+  | ENolink
+  | ENoent
+  | ENomem
+  | ENospc
+  | ENosr
+  | ENostr
+  | ENosys
+  | ENotblk
+  | ENotdir
+  | ENotsup
+  | ENxio
+  | EOpnotsupp
+  | EOverflow
+  | EPerm
+  | EPipe
+  | ERange
+  | ERofs
+  | ESpipe
+  | ESrch
+  | EStale
+  | ETxtbsy
+  | EXdev
+
+derive instance eq_PosixError :: Eq PosixError
+
+--derive instance posixError_generic :: Generic PosixError _
+instance posixError_show :: Show PosixError where
+  show _ = "file posix" --genericShow
+
+foreign import posixErrorToPurs :: Foreign -> Maybe PosixError
+
+data FileError
+  = Eof
+  | BadArg
+  | SystemLimit
+  | Terminated
+  | NoTranslation
+  | Posix PosixError
+  | Other Foreign
+
+instance fileError_show :: Show FileError where
+  show Eof = "eof"
+  show BadArg = "bad arg"
+  show SystemLimit = "system limit"
+  show Terminated = "terminated"
+  show NoTranslation = "no translation"
+  show (Posix posixError) = "posix:" <> show posixError
+  show (Other _other) = "other"
+
+foreign import data FileHandle :: Type
+
+foreign import openImpl ::
+  forall options.
+  (FileError -> Either FileError FileHandle) ->
+  (FileHandle -> Either FileError FileHandle) ->
+  Record (FileOpenOptions) ->
+  FileName ->
+  Record ( modes :: List FileOpenMode | options ) ->
+  Effect (Either FileError FileHandle)
+
+foreign import readImpl ::
+  (FileError -> Either FileError Binary) ->
+  (Binary -> Either FileError Binary) ->
+  FileHandle ->
+  Int ->
+  Effect (Either FileError Binary)
+
+foreign import readFileImpl ::
+  (FileError -> Either FileError Binary) ->
+  (Binary -> Either FileError Binary) ->
+  FileName ->
+  Effect (Either FileError Binary)
+
+foreign import writeImpl ::
+  (FileError -> Either FileError IOData) ->
+  (Either FileError Unit) ->
+  FileHandle ->
+  IOData ->
+  Effect (Either FileError Unit)
+
+foreign import writeFileImpl ::
+  (FileError -> Either FileError IOData) ->
+  (Either FileError Unit) ->
+  FileName ->
+  IOData ->
+  Effect (Either FileError Unit)
+
+foreign import join :: FileName -> FileName -> FileName
+
+foreign import closeImpl ::
+  (FileError -> Either FileError Unit) ->
+  (Either FileError Unit) ->
+  FileHandle ->
+  Effect (Either FileError Unit)
+
+data FileOpenMode
+  = Read
+  | Write
+  | Append
+  | Exclusive
+
+data FileOutputType
+  = List
+  | Binary
+
+data FileDelayedWrite
+  = DelayedWriteDefault
+  | DelayedWrite Int Int
+
+data FileReadAhead
+  = ReadAheadDefault
+  | ReadAhead Int
+
+data Encoding
+  = Latin1
+  | Utf8
+  | Utf16Big
+  | Utf16Little
+  | Utf32Big
+  | Utf32Little
+
+type FileOpenOptions
+  = ( modes :: List FileOpenMode
+    , raw :: Boolean
+    , output :: FileOutputType
+    , delayedWrite :: Maybe FileDelayedWrite
+    , readAhead :: Maybe FileReadAhead
+    , compressed :: Boolean
+    , encoding :: Maybe Encoding
+    , ram :: Boolean
+    , sync :: Boolean
+    , directory :: Boolean
+    )
+
+defaultFileOpenOptions :: Record (FileOpenOptions)
+defaultFileOpenOptions =
+  { modes: List.singleton Read
+  , raw: true
+  , output: Binary
+  , delayedWrite: Nothing
+  , readAhead: Nothing
+  , compressed: false
+  , encoding: Nothing
+  , ram: false
+  , sync: false
+  , directory: false
+  }
+
+-- type Fetch
+--    = forall options trash
+--    . Union options trash Options
+--   => URL
+--   -> Record (method :: Method | options)
+--   -> Aff Response
+open ::
+  forall options trash.
+  Row.Union options trash FileOpenOptions =>
+  FileName -> Record ( modes :: List FileOpenMode | options ) -> Effect (Either FileError FileHandle)
+open = openImpl Left Right defaultFileOpenOptions
+
+read :: FileHandle -> Int -> Effect (Either FileError Binary)
+read = readImpl Left Right
+
+close :: FileHandle -> Effect (Either FileError Unit)
+close = closeImpl Left (Right unit)
+
+write :: FileHandle -> IOData -> Effect (Either FileError Unit)
+write = writeImpl Left (Right unit)
+
+writeFile :: FileName -> IOData -> Effect (Either FileError Unit)
+writeFile = writeFileImpl Left (Right unit)
+
+readFile :: FileName -> Effect (Either FileError Binary)
+readFile = readFileImpl Left Right
+
+newtype FileName
+  = FileName String
+
+derive instance newtype_FileName :: Newtype FileName _
+
+instance toErl_Filename :: ToErl FileName where
+  toErl = unsafeToForeign
+
+derive instance eq_FileName :: Eq FileName
+
+instance semiFileName :: Semigroup FileName where
+  append = join
