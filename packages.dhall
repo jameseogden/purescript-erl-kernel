@@ -7,8 +7,8 @@ in  upstream
         , dependencies = [ "effect", "maybe", "record" ]
         , version = "f20235d464e8767c469c3804cf6bec4501f970e6"
         }
- with erl-untagged =
-        { repo = "https://github.com/id3as/purescript-erl-untagged.git"
+ with erl-untagged-union =
+        { repo = "https://github.com/id3as/purescript-erl-untagged-union.git"
         , dependencies =
         [ "erl-atom"
         , "erl-binary"
@@ -22,5 +22,5 @@ in  upstream
         , "prelude"
         , "unsafe-coerce"
         ]
-        ,   version = "c7ee97165d2c916e56b280eabba866a551a86e49"
+        ,   version = "eb7a10c7930c4b99f1a6bfce767daa814d45dd2b"
         }

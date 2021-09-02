@@ -13,7 +13,7 @@ You can edit this file as you like.
   , "erl-lists"
   , "erl-process"
   , "erl-tuples"
-  , "erl-untagged"
+  , "erl-untagged-union"
   , "foldable-traversable"
   , "foreign"
   , "functions"
