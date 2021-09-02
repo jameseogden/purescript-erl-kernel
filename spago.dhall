@@ -11,7 +11,6 @@ You can edit this file as you like.
   , "erl-atom"
   , "erl-binary"
   , "erl-lists"
-  , "erl-maps"
   , "erl-process"
   , "erl-tuples"
   , "erl-untagged"

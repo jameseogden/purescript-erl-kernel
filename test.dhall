@@ -5,6 +5,6 @@ in conf // {
   dependencies = conf.dependencies #
                [ "assert"
                , "erl-test-eunit"
-               , "console"
+               , "free"
                ]
 }

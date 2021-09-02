@@ -1,16 +1,16 @@
 module Test.Main where
 
 import Prelude
-import Common.Utils (unsafeFromJust, unsafeFromRight)
+
 import Control.Monad.Free (Free)
-import Data.Either (Either(..))
+import Data.Either (Either(..), fromRight')
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe')
 import Data.Show.Generic (genericShow)
+import Effect (Effect)
 import Effect.Class (liftEffect)
 import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
-import Erl.Data.List (List)
 import Erl.Data.Tuple (tuple4)
 import Erl.Kernel.Inet (ConnectAddress(..), HostAddress(..), IpAddress(..), SocketActive(..), SocketAddress(..), ActiveError(..))
 import Erl.Kernel.Tcp (TcpMessage(..))
@@ -19,17 +19,17 @@ import Erl.Kernel.Udp (UdpMessage(..))
 import Erl.Kernel.Udp as Udp
 import Erl.Process (Process, ProcessM, receive, spawnLink, unsafeRunProcessM, (!))
 import Erl.Process.Class (self)
-import Erl.Test.EUnit (TestF, TestSet, collectTests, suite, test)
+import Erl.Test.EUnit (TestF, runTests, suite, test)
 import Erl.Types (Timeout(..))
 import Erl.Untagged.Union (class RuntimeType, type (|$|), type (|+|), Nil, RTLiteralAtom, RTOption, RTTuple1, Union, inj, prj)
+import Partial.Unsafe (unsafeCrashWith)
 import Test.Assert (assertEqual, assertTrue)
 
-kernel_test_ :: List TestSet
-kernel_test_ =
-  collectTests
-    $ do
-        tcpTests
-        udpTests
+
+main :: Effect Unit
+main = void $ runTests do
+  tcpTests
+  udpTests
 
 data Msg
   = Ready
@@ -172,3 +172,9 @@ udpTests = do
             ) ::
               ProcessM UdpMessage Unit
           )
+
+unsafeFromJust :: forall a. String -> Maybe a -> a
+unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
+
+unsafeFromRight :: forall a b. String -> Either a b -> b
+unsafeFromRight s = fromRight' (\_ -> unsafeCrashWith s)
