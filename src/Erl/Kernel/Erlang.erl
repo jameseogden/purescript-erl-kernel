@@ -8,6 +8,7 @@
         , vmNowUs/0
         , termToString/1
         , eqFfi/2
+        , monitor/2
         ]).
 
 makeRef() ->
@@ -45,3 +46,8 @@ termToString(Term) ->
     iolist_to_binary(io_lib:format("~p.", [Term])).
 
 eqFfi(A,B) -> A == B.
+
+monitor(Type, Item) ->
+  fun() ->
+    erlang:monitor(Type, Item)
+  end.
