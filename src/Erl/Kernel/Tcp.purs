@@ -5,6 +5,7 @@ module Erl.Kernel.Tcp
   , ListenOptions
   , SocketPacket
   , OptionToMaybe
+  , TcpSocket
   , TcpMessage(..)
   , Linger(..)
   , ShutdownHow
@@ -42,7 +43,7 @@ import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List)
 import Erl.Data.Tuple (tuple2)
 import Erl.Kernel.File (FileName)
-import Erl.Kernel.Inet (ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError, ListenSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMode(..), TcpSocket, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
+import Erl.Kernel.Inet (class Socket, ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError, ListenSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
 import Erl.Process (class ReceivesMessage)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class IsSupportedMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
@@ -50,6 +51,29 @@ import Foreign (Foreign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
 import Record as Record
+
+foreign import data TcpSocket :: SocketType -> Type
+
+instance eq_TcpActiveSocket :: Eq (TcpSocket ActiveSocket) where
+  eq = eqSocketImpl
+
+instance eq_TcpListenSocket :: Eq (TcpSocket ListenSocket) where
+  eq = eqSocketImpl
+
+foreign import eqSocketImpl :: forall socketType. TcpSocket socketType -> TcpSocket socketType -> Boolean
+
+instance show_TcpActiveSocket :: Show (TcpSocket ActiveSocket) where
+  show = showSocketImpl
+
+instance show_TcpListenSocket :: Show (TcpSocket ListenSocket) where
+  show = showSocketImpl
+
+foreign import showSocketImpl :: forall socketType. TcpSocket socketType -> String
+
+instance socketTcpSocket :: Socket TcpSocket where
+  send = send
+  recv = recv
+  close = close
 
 data AcceptError
   = AcceptClosed

@@ -22,7 +22,10 @@ module Erl.Kernel.Inet
   , SocketType
   , ListenSocket
   , ActiveSocket
-  , TcpSocket
+  , class Socket
+  , send
+  , recv
+  , close
   , SendError(..)
   , ActiveError(..)
   , defaultCommonOptions
@@ -38,19 +41,23 @@ module Erl.Kernel.Inet
   ) where
 
 import Prelude
+
+import Data.Either (Either)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
+import Effect (Effect)
 import Erl.Atom (atom)
 import Erl.Atom.Symbol (toAtom)
 import Erl.Atom.Symbol as AtomSymbol
 import Erl.Data.Binary (Binary)
+import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List, nil, (:))
 import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4)
 import Erl.Kernel.File as File
-import Erl.Types (class ToErl, NonNegInt, toErl)
+import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (type (|+|), Nil, Union)
 import Foreign (Foreign, unsafeToForeign)
 import Prim.Row as Row
@@ -76,23 +83,10 @@ foreign import data ListenSocket :: SocketType
 
 foreign import data ActiveSocket :: SocketType
 
-foreign import data TcpSocket :: SocketType -> Type
-
-instance eq_TcpActiveSocket :: Eq (TcpSocket ActiveSocket) where
-  eq = eqSocketImpl
-
-instance eq_TcpListenSocket :: Eq (TcpSocket ListenSocket) where
-  eq = eqSocketImpl
-
-foreign import eqSocketImpl :: forall socketType. TcpSocket socketType -> TcpSocket socketType -> Boolean
-
-instance show_TcpActiveSocket :: Show (TcpSocket ActiveSocket) where
-  show = showSocketImpl
-
-instance show_TcpListenSocket :: Show (TcpSocket ListenSocket) where
-  show = showSocketImpl
-
-foreign import showSocketImpl :: forall socketType. TcpSocket socketType -> String
+class Socket socket where
+  send :: socket ActiveSocket -> IOData -> Effect (Either SendError Unit)
+  recv :: socket ActiveSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
+  close :: forall socketType. socket socketType -> Effect Unit
 
 data PosixError
   = EAddrinuse
