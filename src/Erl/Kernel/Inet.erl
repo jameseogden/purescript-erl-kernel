@@ -4,14 +4,8 @@
         , sendErrorToPursImpl/2
         , activeErrorToPursImpl/2
         , connectErrorToPursImpl/2
-        , eqSocketImpl/2
-        , showSocketImpl/1
         ]).
 
-eqSocketImpl(Socket, Socket) -> true;
-eqSocketImpl(_, _) -> false.
-
-showSocketImpl(Socket) -> list_to_binary(lists:flatten(io_lib:format("~p", [Socket]))).
 
 posixErrorToPursImpl(eaddrinuse) -> {just, {eaddrinuse}};
 posixErrorToPursImpl(eaddrnotavail) -> {just, {eaddrnotavail}};
