@@ -1,4 +1,4 @@
--module(erl_kerlenl_erlang@foreign).
+-module(erl_kernel_erlang@foreign).
 
 -export([ makeRef/0
         , sleep/1
