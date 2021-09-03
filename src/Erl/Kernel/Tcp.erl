@@ -10,6 +10,8 @@
         , setoptsImpl/4
         , acceptErrorToPursImpl/2
         , listenErrorToPursImpl/2
+        , eqSocketImpl/2
+        , showSocketImpl/1
         ]).
 
 acceptImpl(Left, Right, ListenSocket, Timeout) ->
@@ -99,3 +101,8 @@ acceptErrorToPursImpl(PosixErr, Other) -> PosixErr(Other).
 listenErrorToPursImpl(_PosixErr, system_limit) -> {just, {listenSystemLimit}};
 listenErrorToPursImpl(PosixErr, Other) -> PosixErr(Other).
 
+
+eqSocketImpl(Socket, Socket) -> true;
+eqSocketImpl(_, _) -> false.
+
+showSocketImpl(Socket) -> list_to_binary(lists:flatten(io_lib:format("~p", [Socket]))).
