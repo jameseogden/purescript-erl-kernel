@@ -1,5 +1,6 @@
 module Erl.Kernel.File
-  ( PosixError(..)
+  ( Directory(..)
+  , PosixError(..)
   , FileError(..)
   , FileHandle
   , FileName(..)
@@ -18,7 +19,6 @@ module Erl.Kernel.File
   ) where
 
 import Prelude hiding (join)
-
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
@@ -235,12 +235,19 @@ readFile = readFileImpl Left Right
 newtype FileName
   = FileName String
 
-derive instance newtype_FileName :: Newtype FileName _
+derive instance Newtype FileName _
+derive newtype instance Eq FileName
+derive newtype instance Ord FileName
 
 instance toErl_Filename :: ToErl FileName where
   toErl = unsafeToForeign
 
-derive instance eq_FileName :: Eq FileName
-
 instance semiFileName :: Semigroup FileName where
   append = join
+
+newtype Directory
+  = Directory String
+
+derive instance Newtype Directory _
+derive newtype instance Eq Directory
+derive newtype instance Ord Directory
