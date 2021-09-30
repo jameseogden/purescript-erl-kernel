@@ -9,6 +9,10 @@
         , termToString/1
         , eqFfi/2
         , monitor/2
+        , monotonicTime_/1
+        , strictlyMonotonicInt_/1
+        , currentTimeOffset_/1
+        , nativeTimeToMilliseconds_/1
         ]).
 
 makeRef() ->
@@ -51,3 +55,21 @@ monitor(Type, Item) ->
   fun() ->
     erlang:monitor(Type, Item)
   end.
+
+monotonicTime_(Ctor) ->
+  fun() ->
+      Ctor(erlang:monotonic_time())
+  end.
+
+strictlyMonotonicInt_(Ctor) ->
+  fun() ->
+    Ctor(erlang:unique_integer([monotonic]))
+  end.
+
+currentTimeOffset_(Ctor) ->
+  fun() ->
+    Ctor(erlang:time_offset())
+  end.
+
+nativeTimeToMilliseconds_(Time) ->
+  erlang:convert_time_unit(Time, native, millisecond).
