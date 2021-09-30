@@ -38,6 +38,10 @@ module Erl.Kernel.Inet
   , makeTerms
   , class OptionToErl
   , optionToErl
+  , parseIpAddress
+  , ntoa
+  , ntoa4
+  , ntoa6
   ) where
 
 import Prelude
@@ -396,3 +400,19 @@ foreign import sendErrorToPursImpl :: (Foreign -> Maybe SendError) -> Foreign ->
 foreign import activeErrorToPursImpl :: (Foreign -> Maybe ActiveError) -> Foreign -> Maybe ActiveError
 
 foreign import connectErrorToPursImpl :: (Foreign -> Maybe ConnectError) -> Foreign -> Maybe ConnectError
+
+
+
+
+------------------------------------------------------------------------------
+-- IP Address helpers
+------------------------------------------------------------------------------
+-- FFI
+foreign import parseIpAddress :: String -> Maybe IpAddress
+foreign import ntoa4 :: Ip4Address -> Maybe String
+foreign import ntoa6 :: Ip6Address -> Maybe String
+------------------------------------------------------------------------------
+ntoa :: IpAddress -> Maybe String
+ntoa (Ip4 addr) = ntoa4 addr
+ntoa (Ip6 addr) = ntoa6 addr
+

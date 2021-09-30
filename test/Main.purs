@@ -11,8 +11,8 @@ import Effect (Effect)
 import Effect.Class (liftEffect)
 import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
-import Erl.Data.Tuple (tuple4)
-import Erl.Kernel.Inet (ConnectAddress(..), HostAddress(..), IpAddress(..), SocketActive(..), SocketAddress(..), ActiveError(..))
+import Erl.Data.Tuple (tuple4, tuple8)
+import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), HostAddress(..), IpAddress(..), SocketActive(..), SocketAddress(..), ntoa, ntoa4, ntoa6, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..))
 import Erl.Kernel.Tcp as Tcp
 import Erl.Kernel.Udp (UdpMessage(..))
@@ -30,6 +30,7 @@ main :: Effect Unit
 main = void $ runTests do
   tcpTests
   udpTests
+  ipTests
 
 data Msg
   = Ready
@@ -172,6 +173,58 @@ udpTests = do
             ) ::
               ProcessM UdpMessage Unit
           )
+
+ipTests :: Free TestF Unit
+ipTests = do
+  suite "ip tests" do
+    test "Can convert valid IPv4 address" do
+      let
+        expected = Just $ Ip4 ip4Addr
+        actual = parseIpAddress validIp4Str
+      assertEqual {actual, expected}
+    test "Can convert valid IPv6 address" do
+      let
+        expected =  Just $ Ip6 ip6Addr
+        actual = parseIpAddress validIp6Str
+      assertEqual {actual, expected}
+    test "Fails on invalid IPv4 address" do
+      let
+        ipStr = "123.221.0.256"
+        expected = Nothing
+        actual = parseIpAddress ipStr
+      assertEqual {actual, expected}
+    test "Fails on invalid IPv6 address" do
+      let
+        ipStr = "z001:db8:3333:4444:5555:6666:7777:8888"
+        expected =  Nothing
+        actual = parseIpAddress ipStr
+      assertEqual {actual, expected}
+    test "Can build string from valid Ip4 address" do
+      let
+        expected = Just validIp4Str
+        actual = ntoa $ Ip4 ip4Addr
+      assertEqual {actual, expected}
+    test "Can build string from valid Ip6 address" do
+      let
+        expected = Just validIp6Str
+        actual = ntoa $ Ip6 ip6Addr
+      assertEqual {actual, expected}
+    test "Can build string from Ip4 tuple" do
+      let
+        expected = Just validIp4Str
+        actual = ntoa4 $ ip4Addr
+      assertEqual {actual, expected}
+    test "Can build string from Ip6 tuple" do
+      let
+        expected = Just validIp6Str
+        actual = ntoa6 $ ip6Addr
+      assertEqual {actual, expected}
+  where
+    validIp4Str = "123.221.0.255"
+    ip4Addr = (tuple4 123 221 0 255)
+    validIp6Str =  "2001:db8:3333:4444:5555:6666:7777:8888"
+    ip6Addr = (tuple8 8193 3512 13107 17476 21845 26214 30583 34952)
+
 
 unsafeFromJust :: forall a. String -> Maybe a -> a
 unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
