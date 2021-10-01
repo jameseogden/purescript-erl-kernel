@@ -9,9 +9,12 @@ module Erl.Kernel.Erlang
   , eqFfi
   , monitor
   , monotonicTime
+  , monotonicStartTime
+  , monotonicTimeDelta
   , strictlyMonotonicInt
   , currentTimeOffset
   , monotonicTimeToInstant
+  , nativeTimeToMilliseconds
   ) where
 
 import Prelude
@@ -22,7 +25,7 @@ import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Erl.Atom (Atom)
 import Erl.Process.Raw (Pid)
-import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), Ref, StrictlyMonotonicInt(..), TimeOffset(..))
+import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Ref, StrictlyMonotonicInt(..), TimeOffset(..))
 import Foreign (Foreign)
 
 foreign import makeRef :: Effect Ref
@@ -48,6 +51,21 @@ monotonicTime = monotonicTime_ MonotonicTime
 
 foreign import monotonicTime_ :: (Int -> MonotonicTime) -> Effect MonotonicTime
 
+monotonicStartTime :: MonotonicTime
+monotonicStartTime = monotonicStartTime_ MonotonicTime
+
+foreign import monotonicStartTime_ :: (Int -> MonotonicTime) -> MonotonicTime
+
+monotonicTimeDelta :: MonotonicTime -> MonotonicTime -> NativeTime
+monotonicTimeDelta (MonotonicTime start) (MonotonicTime end) =
+  NativeTime $ end - start
+
+nativeTimeToMilliseconds :: NativeTime -> Milliseconds
+nativeTimeToMilliseconds (NativeTime t) =
+  nativeTimeToMilliseconds_ (Milliseconds <<< toNumber) t
+
+foreign import nativeTimeToMilliseconds_ :: (Int -> Milliseconds) -> Int -> Milliseconds
+
 currentTimeOffset :: Effect TimeOffset
 currentTimeOffset = currentTimeOffset_ TimeOffset
 
@@ -60,6 +78,4 @@ foreign import strictlyMonotonicInt_ :: (Int -> StrictlyMonotonicInt) -> Effect 
 
 monotonicTimeToInstant :: MonotonicTime -> TimeOffset -> Maybe Instant
 monotonicTimeToInstant (MonotonicTime t) (TimeOffset o) =
-  instant $ Milliseconds $ toNumber $ nativeTimeToMilliseconds_ $ t + o
-
-foreign import nativeTimeToMilliseconds_ :: Int -> Int
+  instant $ nativeTimeToMilliseconds $ NativeTime $ t + o

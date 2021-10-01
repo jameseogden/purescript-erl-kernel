@@ -10,9 +10,10 @@
         , eqFfi/2
         , monitor/2
         , monotonicTime_/1
+        , monotonicStartTime_/1
         , strictlyMonotonicInt_/1
         , currentTimeOffset_/1
-        , nativeTimeToMilliseconds_/1
+        , nativeTimeToMilliseconds_/2
         ]).
 
 makeRef() ->
@@ -60,6 +61,12 @@ monotonicTime_(Ctor) ->
   fun() ->
       Ctor(erlang:monotonic_time())
   end.
+
+monotonicStartTime_(Ctor) ->
+  Ctor(erlang:system_info(start_time)).
+
+nativeTimeToMilliseconds_(Ctor, Time) ->
+  Ctor(erlang:convert_time_unit(Time, native, millisecond)).
 
 strictlyMonotonicInt_(Ctor) ->
   fun() ->

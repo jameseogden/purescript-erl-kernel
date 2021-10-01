@@ -2,6 +2,7 @@ module Erl.Types
   ( NonNegInt
   , PosInt
   , MonotonicTime(..)
+  , NativeTime(..)
   , StrictlyMonotonicInt(..)
   , TimeOffset(..)
   , Second(..)
@@ -38,6 +39,9 @@ foreign import data Ref :: Type
 
 newtype MonotonicTime
   = MonotonicTime Int
+
+newtype NativeTime
+  = NativeTime Int
 
 newtype TimeOffset
   = TimeOffset Int
