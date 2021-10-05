@@ -81,6 +81,10 @@ instance Socket (TcpSocket CanGenerateMessages) where
   send = send
   recv = recv
   close = close
+instance Socket (TcpSocket CannotGenerateMessages) where
+  send = send
+  recv = recv
+  close = close
 
 data AcceptError
   = AcceptClosed
