@@ -1,7 +1,6 @@
 module Test.Main where
 
 import Prelude
-
 import Control.Monad.Free (Free)
 import Data.Either (Either(..), fromRight')
 import Data.Generic.Rep (class Generic)
@@ -13,24 +12,24 @@ import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
 import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), HostAddress(..), IpAddress(..), SocketActive(..), SocketAddress(..), ntoa, ntoa4, ntoa6, parseIpAddress)
-import Erl.Kernel.Tcp (TcpMessage(..))
+import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
 import Erl.Kernel.Udp (UdpMessage(..))
 import Erl.Kernel.Udp as Udp
-import Erl.Process (Process, ProcessM, receive, spawnLink, unsafeRunProcessM, (!))
-import Erl.Process.Class (self)
+import Erl.Process (Process, ProcessM, receive, self, spawnLink, unsafeRunProcessM, (!))
 import Erl.Test.EUnit (TestF, runTests, suite, test)
 import Erl.Types (Timeout(..))
 import Erl.Untagged.Union (class RuntimeType, type (|$|), type (|+|), Nil, RTLiteralAtom, RTOption, RTTuple1, Union, inj, prj)
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Assert (assertEqual, assertTrue)
 
-
 main :: Effect Unit
-main = void $ runTests do
-  tcpTests
-  udpTests
-  ipTests
+main =
+  void
+    $ runTests do
+        tcpTests
+        udpTests
+        ipTests
 
 data Msg
   = Ready
@@ -101,6 +100,26 @@ tcpTests = do
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
             client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
+            _ <- liftEffect $ setopts client { active: Passive } -- this is a noop since it's already an active socket, but it is proving that the compiler allows us to change the option
+            liftEffect
+              $ do
+                  _ <- Tcp.send client $ fromBinary $ toBinary "hello"
+                  msg1 <- unsafeFromRight "recv failed" <$> Tcp.recv client 3 InfiniteTimeout
+                  _ <- assertTrue $ msg1 == toBinary "wor"
+                  msg2 <- unsafeFromRight "recv failed" <$> Tcp.recv client 2 InfiniteTimeout
+                  _ <- assertTrue $ msg2 == toBinary "ld"
+                  closed <- Tcp.recv client 0 InfiniteTimeout
+                  assertTrue $ closed == Left ActiveClosed
+    test "can create passive sockets" do
+      unsafeRunProcessM
+        $ do
+            self <- self
+            _server <- liftEffect $ spawnLink $ server self
+            ready <- receive
+            liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
+            client <- liftEffect $ unsafeFromRight "connect failed" <$> Tcp.connectPassive (SocketAddr (IpAddress (Ip4 $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
+            _ <- liftEffect $ setopts client { reuseaddr: true } -- this is pointless since the socket is connected, but it is proving that the compiler allows us to change some options
+            --_ <- liftEffect $ setopts client { active: Active } -- this is not valid, the compiler enforces that you cannot set 'active' on a connectPassive socket
             liftEffect
               $ do
                   _ <- Tcp.send client $ fromBinary $ toBinary "hello"
@@ -181,50 +200,49 @@ ipTests = do
       let
         expected = Just $ Ip4 ip4Addr
         actual = parseIpAddress validIp4Str
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Can convert valid IPv6 address" do
       let
-        expected =  Just $ Ip6 ip6Addr
+        expected = Just $ Ip6 ip6Addr
         actual = parseIpAddress validIp6Str
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Fails on invalid IPv4 address" do
       let
         ipStr = "123.221.0.256"
         expected = Nothing
         actual = parseIpAddress ipStr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Fails on invalid IPv6 address" do
       let
         ipStr = "z001:db8:3333:4444:5555:6666:7777:8888"
-        expected =  Nothing
+        expected = Nothing
         actual = parseIpAddress ipStr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Can build string from valid Ip4 address" do
       let
         expected = Just validIp4Str
         actual = ntoa $ Ip4 ip4Addr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Can build string from valid Ip6 address" do
       let
         expected = Just validIp6Str
         actual = ntoa $ Ip6 ip6Addr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Can build string from Ip4 tuple" do
       let
         expected = Just validIp4Str
         actual = ntoa4 $ ip4Addr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Can build string from Ip6 tuple" do
       let
         expected = Just validIp6Str
         actual = ntoa6 $ ip6Addr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
   where
-    validIp4Str = "123.221.0.255"
-    ip4Addr = (tuple4 123 221 0 255)
-    validIp6Str =  "2001:db8:3333:4444:5555:6666:7777:8888"
-    ip6Addr = (tuple8 8193 3512 13107 17476 21845 26214 30583 34952)
-
+  validIp4Str = "123.221.0.255"
+  ip4Addr = (tuple4 123 221 0 255)
+  validIp6Str = "2001:db8:3333:4444:5555:6666:7777:8888"
+  ip6Addr = (tuple8 8193 3512 13107 17476 21845 26214 30583 34952)
 
 unsafeFromJust :: forall a. String -> Maybe a -> a
 unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
