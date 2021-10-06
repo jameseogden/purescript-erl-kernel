@@ -10,7 +10,7 @@ in  upstream
  with erl-process =
         { repo = "https://github.com/id3as/purescript-erl-process"
         , dependencies = [ "effect", "prelude" ]
-        , version = "afbfa4e7a13c0d55609ff144d49982563fada7f5"
+        , version = "fc793e11ed2b0a0b3c38441de9dacb8652b1bbeb"
         }
  with erl-untagged-union =
         { repo = "https://github.com/id3as/purescript-erl-untagged-union.git"

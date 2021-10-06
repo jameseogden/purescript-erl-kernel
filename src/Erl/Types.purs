@@ -21,7 +21,7 @@ module Erl.Types
   ) where
 
 import Prelude
-import Data.Int (floor, toNumber)
+import Data.Int (floor, round, toNumber)
 import Data.Newtype (class Newtype)
 import Data.Time.Duration as Duration
 import Erl.Atom (atom)
@@ -64,7 +64,7 @@ newtype FfiMilliseconds
   = FfiMilliseconds Int
 
 toFfiMilliseconds :: Duration.Milliseconds -> FfiMilliseconds
-toFfiMilliseconds (Duration.Milliseconds ms) = FfiMilliseconds $ floor ms
+toFfiMilliseconds (Duration.Milliseconds ms) = FfiMilliseconds $ round ms
 
 fromFfiMilliseconds :: FfiMilliseconds -> Duration.Milliseconds
 fromFfiMilliseconds (FfiMilliseconds ms) = Duration.Milliseconds $ toNumber ms
@@ -157,7 +157,7 @@ instance toErl_Nanosecond :: ToErl Nanosecond where
   toErl (Nanosecond val) = unsafeToForeign val
 
 data Timeout
-  = Timeout NonNegInt
+  = Timeout Duration.Milliseconds
   | InfiniteTimeout
 
 data IntOrInfinity
@@ -184,7 +184,7 @@ instance toErl_Infinity :: ToErl IntOrInfinity where
   toErl (Infinity) = unsafeToForeign $ atom "infinity"
 
 instance toErl_Timeout :: ToErl Timeout where
-  toErl (Timeout n) = unsafeToForeign n
+  toErl (Timeout (Duration.Milliseconds ms)) = unsafeToForeign $ round ms
   toErl (InfiniteTimeout) = unsafeToForeign $ atom "infinity"
 
 instance toErl_String :: ToErl String where
