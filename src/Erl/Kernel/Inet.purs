@@ -21,10 +21,10 @@ module Erl.Kernel.Inet
   , CommonOptions
   , SocketType
   , ListenSocket
+  , ConnectedSocket
+  , SocketMessageBehaviour
   , ActiveSocket
-  , SocketMessages
-  , CanGenerateMessages
-  , CannotGenerateMessages
+  , PassiveSocket
   , InterfaceName
   , InterfaceFlags(..)
   , InterfaceAddresses(..)
@@ -67,7 +67,6 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
-import Debug.Trace (spy)
 import Effect (Effect)
 import Erl.Atom (Atom, atom)
 import Erl.Atom.Symbol (toAtom)
@@ -101,24 +100,24 @@ type Hextet
 data SocketType
 
 foreign import data ListenSocket :: SocketType
-foreign import data ActiveSocket :: SocketType
+foreign import data ConnectedSocket :: SocketType
 
-data SocketMessages
+data SocketMessageBehaviour
 
-foreign import data CanGenerateMessages :: SocketMessages
-foreign import data CannotGenerateMessages :: SocketMessages
+foreign import data ActiveSocket :: SocketMessageBehaviour
+foreign import data PassiveSocket :: SocketMessageBehaviour
 
-class OptionsValid :: SocketMessages -> Row Type -> Constraint
-class OptionsValid socketMessages options
+class OptionsValid :: SocketMessageBehaviour -> Row Type -> Constraint
+class OptionsValid socketMessageBehaviour options
 
-instance OptionsValid CanGenerateMessages options
+instance OptionsValid ActiveSocket options
 
-instance (Row.Lacks "active" options) => OptionsValid CannotGenerateMessages options
+instance (Row.Lacks "active" options) => OptionsValid PassiveSocket options
 
 class Socket socket where
-  send :: socket ActiveSocket -> IOData -> Effect (Either SendError Unit)
+  send :: socket ConnectedSocket -> IOData -> Effect (Either SendError Unit)
 
-  recv :: socket ActiveSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
+  recv :: socket ConnectedSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
 
   close :: forall socketType. socket socketType -> Effect Unit
 
@@ -199,8 +198,8 @@ instance showIpAddress :: Show IpAddress where
   show (Ip6 ip6Address) = show ip6Address
 
 isMulticast :: IpAddress -> Boolean
-isMulticast (Ip4 addr) = uncurry4 (\a _b _c _d -> a .&. 0xf0 == 0xe0) addr
-isMulticast (Ip6 addr) = uncurry8 (\a _b _c _d _e _f _g _h -> a .&. 0xff00 == 0xff00) addr
+isMulticast (Ip4 (Ip4Address addr)) = uncurry4 (\a _b _c _d -> a .&. 0xf0 == 0xe0) addr
+isMulticast (Ip6 (Ip6Address addr)) = uncurry8 (\a _b _c _d _e _f _g _h -> a .&. 0xff00 == 0xff00) addr
 
 type LocalAddress
   = String

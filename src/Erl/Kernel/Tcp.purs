@@ -27,6 +27,7 @@ module Erl.Kernel.Tcp
   , send
   , shutdown
   , setopts
+  , convertPassiveToActive
   ) where
 
 import Prelude
@@ -44,7 +45,7 @@ import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List)
 import Erl.Data.Tuple (tuple2)
 import Erl.Kernel.File (FileName)
-import Erl.Kernel.Inet (class OptionsValid, class Socket, ActiveError, ActiveSocket, AddressFamily, CanGenerateMessages, CannotGenerateMessages, CommonOptions, ConnectAddress, ConnectError, ListenSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMessages, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
+import Erl.Kernel.Inet (class OptionsValid, class Socket, ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError, ConnectedSocket, ListenSocket, PassiveSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
 import Erl.Process (class ReceivesMessage)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (class IsSupportedMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
@@ -52,36 +53,37 @@ import Foreign (Foreign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
 import Record as Record
+import Unsafe.Coerce (unsafeCoerce)
 
-foreign import data TcpSocket :: SocketMessages -> SocketType -> Type
+foreign import data TcpSocket :: SocketMessageBehaviour -> SocketType -> Type
 
-instance Eq (TcpSocket CanGenerateMessages ActiveSocket) where
+instance Eq (TcpSocket ActiveSocket ConnectedSocket) where
   eq = eqSocketImpl
-instance Eq (TcpSocket CannotGenerateMessages ActiveSocket) where
+instance Eq (TcpSocket PassiveSocket ConnectedSocket) where
   eq = eqSocketImpl
-instance Eq (TcpSocket CanGenerateMessages ListenSocket) where
+instance Eq (TcpSocket ActiveSocket ListenSocket) where
   eq = eqSocketImpl
-instance Eq (TcpSocket CannotGenerateMessages ListenSocket) where
+instance Eq (TcpSocket PassiveSocket ListenSocket) where
   eq = eqSocketImpl
 
-foreign import eqSocketImpl :: forall socketMessages socketType. TcpSocket socketMessages socketType -> TcpSocket socketMessages socketType -> Boolean
+foreign import eqSocketImpl :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> TcpSocket socketMessageBehaviour socketType -> Boolean
 
-instance Show (TcpSocket CanGenerateMessages ActiveSocket) where
+instance Show (TcpSocket ActiveSocket ConnectedSocket) where
   show = showSocketImpl
-instance Show (TcpSocket CannotGenerateMessages ActiveSocket) where
+instance Show (TcpSocket PassiveSocket ConnectedSocket) where
   show = showSocketImpl
-instance Show (TcpSocket CanGenerateMessages ListenSocket) where
+instance Show (TcpSocket ActiveSocket ListenSocket) where
   show = showSocketImpl
-instance Show (TcpSocket CannotGenerateMessages ListenSocket) where
+instance Show (TcpSocket PassiveSocket ListenSocket) where
   show = showSocketImpl
 
-foreign import showSocketImpl :: forall socketMessages socketType. TcpSocket socketMessages socketType -> String
+foreign import showSocketImpl :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> String
 
-instance Socket (TcpSocket CanGenerateMessages) where
+instance Socket (TcpSocket ActiveSocket) where
   send = send
   recv = recv
   close = close
-instance Socket (TcpSocket CannotGenerateMessages) where
+instance Socket (TcpSocket PassiveSocket) where
   send = send
   recv = recv
   close = close
@@ -216,10 +218,10 @@ listenOptions ::
 listenOptions options = convertOptionsWithDefaults OptionToMaybe defaultListenOptions options
 
 data TcpMessage
-  = Tcp (TcpSocket CanGenerateMessages ActiveSocket) Binary
-  | Tcp_error (TcpSocket CanGenerateMessages ActiveSocket) ActiveError
-  | Tcp_closed (TcpSocket CanGenerateMessages ActiveSocket)
-  | Tcp_passive (TcpSocket CanGenerateMessages ActiveSocket)
+  = Tcp (TcpSocket ActiveSocket ConnectedSocket) Binary
+  | Tcp_error (TcpSocket ActiveSocket ConnectedSocket) ActiveError
+  | Tcp_closed (TcpSocket ActiveSocket ConnectedSocket)
+  | Tcp_passive (TcpSocket ActiveSocket ConnectedSocket)
 
 derive instance eq_TcpMessage :: Eq TcpMessage
 
@@ -306,19 +308,27 @@ else instance convertOption_OptionToMaybe :: ConvertOption OptionToMaybe sym (Ma
 else instance convertOption_OptionToMaybe2 :: ConvertOption OptionToMaybe sym a (Maybe a) where
   convertOption _ _ val = Just val
 
+convertPassiveToActive ::
+  forall msg m.
+  MonadEffect m =>
+  ReceivesMessage m msg =>
+  IsSupportedMessage TcpMessage msg =>
+  TcpSocket PassiveSocket ConnectedSocket -> TcpSocket ActiveSocket ConnectedSocket
+convertPassiveToActive = unsafeCoerce
+
 accept ::
   forall msg m.
   MonadEffect m =>
   ReceivesMessage m msg =>
   IsSupportedMessage TcpMessage msg =>
-  TcpSocket CanGenerateMessages ListenSocket -> Timeout -> m (Either AcceptError (TcpSocket CanGenerateMessages ActiveSocket))
+  TcpSocket ActiveSocket ListenSocket -> Timeout -> m (Either AcceptError (TcpSocket ActiveSocket ConnectedSocket))
 accept socket timeout = liftEffect $ acceptImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< acceptErrorToPurs) Right socket (toErl timeout)
 
 acceptPassive ::
-  TcpSocket CannotGenerateMessages ListenSocket -> Timeout -> Effect (Either AcceptError (TcpSocket CannotGenerateMessages ActiveSocket))
+  TcpSocket PassiveSocket ListenSocket -> Timeout -> Effect (Either AcceptError (TcpSocket PassiveSocket ConnectedSocket))
 acceptPassive socket timeout = liftEffect $ acceptImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< acceptErrorToPurs) Right socket (toErl timeout)
 
-close :: forall socketMessages socketType. TcpSocket socketMessages socketType -> Effect Unit
+close :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> Effect Unit
 close = closeImpl
 
 connect ::
@@ -329,7 +339,7 @@ connect ::
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions)) =>
-  ConnectAddress -> Port -> Record options -> Timeout -> m (Either ConnectError (TcpSocket CanGenerateMessages ActiveSocket))
+  ConnectAddress -> Port -> Record options -> Timeout -> m (Either ConnectError (TcpSocket ActiveSocket ConnectedSocket))
 connect address port options timeout = do
   let
     addressErl = toErl address
@@ -345,7 +355,7 @@ connectPassive ::
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions)) =>
-  ConnectAddress -> Port -> Record options -> Timeout -> Effect (Either ConnectError (TcpSocket CannotGenerateMessages ActiveSocket))
+  ConnectAddress -> Port -> Record options -> Timeout -> Effect (Either ConnectError (TcpSocket PassiveSocket ConnectedSocket))
 connectPassive address port options timeout = do
   let
     addressErl = toErl address
@@ -362,7 +372,7 @@ listen ::
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ListenOptions)) =>
-  Port -> Record options -> Effect (Either ListenError (TcpSocket CanGenerateMessages ListenSocket))
+  Port -> Record options -> Effect (Either ListenError (TcpSocket ActiveSocket ListenSocket))
 listen port options = do
   let
     forced = Record.disjointUnion forcedOptions options
@@ -376,7 +386,7 @@ listenPassive ::
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record ListenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ListenOptions)) =>
-  Port -> Record options -> Effect (Either ListenError (TcpSocket CannotGenerateMessages ListenSocket))
+  Port -> Record options -> Effect (Either ListenError (TcpSocket PassiveSocket ListenSocket))
 listenPassive port options = do
   let
     forced = Record.disjointUnion forcedOptions options
@@ -384,22 +394,22 @@ listenPassive port options = do
     optionsErl = optionsToErl $ merged { active = Just Passive }
   listenImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< listenErrorToPurs) Right port optionsErl
 
-recv :: forall socketMessages. TcpSocket socketMessages ActiveSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
+recv :: forall socketMessageBehaviour. TcpSocket socketMessageBehaviour ConnectedSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
 recv socket length timeout = recvImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< activeErrorToPurs) Right socket length (toErl timeout)
 
-send :: forall socketMessages. TcpSocket socketMessages ActiveSocket -> IOData -> Effect (Either SendError Unit)
+send :: forall socketMessageBehaviour. TcpSocket socketMessageBehaviour ConnectedSocket -> IOData -> Effect (Either SendError Unit)
 send = sendImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< sendErrorToPurs) Right
 
-shutdown :: forall socketMessages socketType. TcpSocket socketMessages socketType -> ShutdownHow -> Effect (Either PosixError Unit)
+shutdown :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> ShutdownHow -> Effect (Either PosixError Unit)
 shutdown = shutdownImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< posixErrorToPurs) Right
 
 setopts ::
-  forall options socketMessages socketType.
+  forall options socketMessageBehaviour socketType.
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record (Options ())) (Record (ForcedOptions options)) (Record (ForcedOptions (Options ()))) =>
-  OptionsValid socketMessages options =>
-  TcpSocket socketMessages socketType -> Record options -> Effect (Either PosixError Unit)
+  OptionsValid socketMessageBehaviour options =>
+  TcpSocket socketMessageBehaviour socketType -> Record options -> Effect (Either PosixError Unit)
 setopts socket options = do
   let
     forced = Record.disjointUnion forcedOptions options
@@ -408,65 +418,65 @@ setopts socket options = do
   liftEffect $ setoptsImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< posixErrorToPurs) Right socket optionsErl
 
 foreign import acceptImpl ::
-  forall socketMessages.
-  (Foreign -> Either AcceptError (TcpSocket socketMessages ActiveSocket)) ->
-  ((TcpSocket socketMessages ActiveSocket) -> Either AcceptError (TcpSocket socketMessages ActiveSocket)) ->
-  TcpSocket socketMessages ListenSocket ->
+  forall socketMessageBehaviour.
+  (Foreign -> Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
+  ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
+  TcpSocket socketMessageBehaviour ListenSocket ->
   Foreign ->
-  Effect (Either AcceptError (TcpSocket socketMessages ActiveSocket))
+  Effect (Either AcceptError (TcpSocket socketMessageBehaviour ConnectedSocket))
 
 foreign import closeImpl ::
-  forall socketMessages socketType.
-  TcpSocket socketMessages socketType -> Effect Unit
+  forall socketMessageBehaviour socketType.
+  TcpSocket socketMessageBehaviour socketType -> Effect Unit
 
 foreign import connectImpl ::
-  forall socketMessages.
-  (Foreign -> Either ConnectError (TcpSocket socketMessages ActiveSocket)) ->
-  ((TcpSocket socketMessages ActiveSocket) -> Either ConnectError (TcpSocket socketMessages ActiveSocket)) ->
+  forall socketMessageBehaviour.
+  (Foreign -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
+  ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
   Foreign ->
   Int ->
   List Foreign ->
   Foreign ->
-  Effect (Either ConnectError (TcpSocket socketMessages ActiveSocket))
+  Effect (Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket))
 
 foreign import listenImpl ::
-  forall socketMessages.
-  (Foreign -> Either ListenError (TcpSocket socketMessages ListenSocket)) ->
-  ((TcpSocket socketMessages ListenSocket) -> Either ListenError (TcpSocket socketMessages ListenSocket)) ->
+  forall socketMessageBehaviour.
+  (Foreign -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket)) ->
+  ((TcpSocket socketMessageBehaviour ListenSocket) -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket)) ->
   Int ->
   List Foreign ->
-  Effect (Either ListenError (TcpSocket socketMessages ListenSocket))
+  Effect (Either ListenError (TcpSocket socketMessageBehaviour ListenSocket))
 
 foreign import recvImpl ::
-  forall socketMessages.
+  forall socketMessageBehaviour.
   (Foreign -> Either ActiveError Binary) ->
   (Binary -> Either ActiveError Binary) ->
-  TcpSocket socketMessages ActiveSocket ->
+  TcpSocket socketMessageBehaviour ConnectedSocket ->
   NonNegInt ->
   Foreign ->
   Effect (Either ActiveError Binary)
 
 foreign import sendImpl ::
-  forall socketMessages.
+  forall socketMessageBehaviour.
   (Foreign -> Either SendError Unit) ->
   (Unit -> Either SendError Unit) ->
-  TcpSocket socketMessages ActiveSocket ->
+  TcpSocket socketMessageBehaviour ConnectedSocket ->
   IOData ->
   Effect (Either SendError Unit)
 
 foreign import shutdownImpl ::
-  forall socketMessages socketType.
+  forall socketMessageBehaviour socketType.
   (Foreign -> Either PosixError Unit) ->
   (Unit -> Either PosixError Unit) ->
-  TcpSocket socketMessages socketType ->
+  TcpSocket socketMessageBehaviour socketType ->
   ShutdownHow ->
   Effect (Either PosixError Unit)
 
 foreign import setoptsImpl ::
-  forall socketMessages socketType.
+  forall socketMessageBehaviour socketType.
   (Foreign -> Either PosixError Unit) ->
   (Unit -> Either PosixError Unit) ->
-  TcpSocket socketMessages socketType ->
+  TcpSocket socketMessageBehaviour socketType ->
   List Foreign ->
   Effect (Either PosixError Unit)
 
