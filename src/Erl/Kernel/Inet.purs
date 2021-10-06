@@ -389,7 +389,7 @@ class OptionToErl sym option where
   optionToErl :: List Foreign -> AtomSymbol.Atom sym -> option -> List Foreign
 
 instance optionToErl_Raw :: OptionToErl "raw" (List Raw) where
-  optionToErl acc _name raws = foldl (\acc raw -> toErl raw : acc) acc raws
+  optionToErl acc _name raws = foldl (\acc' raw -> toErl raw : acc') acc raws
 else instance optionToErl_List :: (IsSymbol name, ToErl a) => OptionToErl name (List a) where
   optionToErl acc name val = (unsafeToForeign $ tuple2 (toAtom name) (toErl <$> val)) : acc
 else instance optionToErl_Other :: (IsSymbol name, ToErl a) => OptionToErl name a where

@@ -69,8 +69,8 @@ data UdpMessage
 
 derive instance eq_UdpMessage :: Eq UdpMessage
 instance show_UdpMessage :: Show UdpMessage where
-  show (Udp socket ip port _bin) = "udp-data: " <> show socket <> ", " <> show ip <> ", " <> show port <> " / binary"
-  show (UdpAnc socket ip port _anc _bin) = "udp-anc-data: " <> show socket <> ", " <> show ip <> ", " <> show port <> " / binary"
+  show (Udp socket ip port' _bin) = "udp-data: " <> show socket <> ", " <> show ip <> ", " <> show port' <> " / binary"
+  show (UdpAnc socket ip port' _anc _bin) = "udp-anc-data: " <> show socket <> ", " <> show ip <> ", " <> show port' <> " / binary"
   show (Udp_passive socket) = "udp-passive: " <> show socket
 
 instance runtimeTypeUdpMessage ::
@@ -88,8 +88,8 @@ data UdpRecvData
 
 derive instance eq_UdpRecvData :: Eq UdpRecvData
 instance show_UdpRecvData :: Show UdpRecvData where
-  show (Data ip port _bin) = "udp-data: " <> show ip <> ", " <> show port <> " / binary"
-  show (DataAnc ip port _anc _bin) = "udp-anc-data: " <> show ip <> ", " <> show port <> " / binary"
+  show (Data ip port' _bin) = "udp-data: " <> show ip <> ", " <> show port' <> " / binary"
+  show (DataAnc ip port' _anc _bin) = "udp-anc-data: " <> show ip <> ", " <> show port' <> " / binary"
 
 data SocketPacket
   = Raw
@@ -223,11 +223,11 @@ open ::
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions)) =>
   Port -> Record options -> m (Either OpenError (UdpSocket CanGenerateMessages))
-open port options = do
+open port' options = do
   let
     forced = Record.disjointUnion forcedOptions options
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultOpenOptions forced
-  liftEffect $ openImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< openErrorToPurs) Right port optionsErl
+  liftEffect $ openImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< openErrorToPurs) Right port' optionsErl
 
 openPassive ::
   forall options.
@@ -236,18 +236,18 @@ openPassive ::
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions)) =>
   Port -> Record options -> Effect (Either OpenError (UdpSocket CannotGenerateMessages))
-openPassive port options = do
+openPassive port' options = do
   let
     forced = Record.disjointUnion forcedOptions options
     merged = convertOptionsWithDefaults OptionToMaybe defaultOpenOptions forced
     optionsErl = optionsToErl $ merged { active = Just Passive }
-  liftEffect $ openImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< openErrorToPurs) Right port optionsErl
+  liftEffect $ openImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< openErrorToPurs) Right port' optionsErl
 
 send :: forall socketMessages. UdpSocket socketMessages -> HostAddress -> Port -> IOData -> Effect (Either SendError Unit)
-send socket host port packet = do
+send socket host port' packet = do
   let
     hostErl = toErl host
-  liftEffect $ sendImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< sendErrorToPurs) Right socket hostErl port packet
+  liftEffect $ sendImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< sendErrorToPurs) Right socket hostErl port' packet
 
 recv :: forall socketMessages. UdpSocket socketMessages -> Timeout -> Effect (Either ReceiveError UdpRecvData)
 recv socket timeout = do
