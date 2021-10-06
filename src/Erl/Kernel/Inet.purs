@@ -22,6 +22,10 @@ module Erl.Kernel.Inet
   , SocketType
   , ListenSocket
   , ActiveSocket
+  , SocketMessages
+  , CanGenerateMessages
+  , CannotGenerateMessages
+  , class OptionsValid
   , class Socket
   , send
   , recv
@@ -45,7 +49,6 @@ module Erl.Kernel.Inet
   ) where
 
 import Prelude
-
 import Data.Either (Either)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
@@ -85,12 +88,25 @@ type Hextet
 data SocketType
 
 foreign import data ListenSocket :: SocketType
-
 foreign import data ActiveSocket :: SocketType
+
+data SocketMessages
+
+foreign import data CanGenerateMessages :: SocketMessages
+foreign import data CannotGenerateMessages :: SocketMessages
+
+class OptionsValid :: SocketMessages -> Row Type -> Constraint
+class OptionsValid socketMessages options
+
+instance OptionsValid CanGenerateMessages options
+
+instance (Row.Lacks "active" options) => OptionsValid CannotGenerateMessages options
 
 class Socket socket where
   send :: socket ActiveSocket -> IOData -> Effect (Either SendError Unit)
+
   recv :: socket ActiveSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
+
   close :: forall socketType. socket socketType -> Effect Unit
 
 data PosixError
@@ -417,9 +433,6 @@ foreign import activeErrorToPursImpl :: (Foreign -> Maybe ActiveError) -> Foreig
 
 foreign import connectErrorToPursImpl :: (Foreign -> Maybe ConnectError) -> Foreign -> Maybe ConnectError
 
-
-
-
 ------------------------------------------------------------------------------
 -- IP Address helpers
 ------------------------------------------------------------------------------
@@ -431,4 +444,3 @@ foreign import ntoa6 :: Ip6Address -> Maybe String
 ntoa :: IpAddress -> Maybe String
 ntoa (Ip4 addr) = ntoa4 addr
 ntoa (Ip6 addr) = ntoa6 addr
-
