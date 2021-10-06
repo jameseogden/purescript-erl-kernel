@@ -64,6 +64,7 @@ import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
 import Data.Int.Bits ((.&.))
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
 import Debug.Trace (spy)
@@ -78,7 +79,7 @@ import Erl.Data.Map (Map, lookup)
 import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4, uncurry4, uncurry8)
 import Erl.Kernel.File as File
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
-import Erl.Untagged.Union (type (|+|), Nil, Union)
+import Erl.Untagged.Union (class RuntimeType, type (|+|), Nil, RTInt, RTTuple4, RTTuple8, Union)
 import Foreign (Foreign, unsafeToForeign)
 import Prim.Row as Row
 import Prim.RowList as RL
@@ -165,11 +166,24 @@ posixErrorToPurs f = case posixErrorToPursImpl f of
 
 foreign import posixErrorToPursImpl :: Foreign -> Maybe PosixError
 
-type Ip4Address
-  = Tuple4 Octet Octet Octet Octet
+newtype Ip4Address
+  = Ip4Address (Tuple4 Octet Octet Octet Octet)
 
-type Ip6Address
-  = Tuple8 Hextet Hextet Hextet Hextet Hextet Hextet Hextet Hextet
+derive instance eqIp4Address :: Eq Ip4Address
+instance showIp4Address :: Show Ip4Address where
+  show (Ip4Address ip4Address) = "ip4: " <> show ip4Address
+
+derive instance Newtype Ip4Address _
+instance RuntimeType Ip4Address (RTTuple4 RTInt RTInt RTInt RTInt)
+
+newtype Ip6Address
+  = Ip6Address (Tuple8 Hextet Hextet Hextet Hextet Hextet Hextet Hextet Hextet)
+
+derive instance Eq Ip6Address
+instance showIp6Address :: Show Ip6Address where
+  show (Ip6Address ip6Address) = "ip6: " <> show ip6Address
+derive instance Newtype Ip6Address _
+instance RuntimeType Ip6Address (RTTuple8 RTInt RTInt RTInt RTInt RTInt RTInt RTInt RTInt)
 
 data IpAddress
   = Ip4 Ip4Address
@@ -181,8 +195,8 @@ type IpAddressUnion
 derive instance eqIpAddress :: Eq IpAddress
 
 instance showIpAddress :: Show IpAddress where
-  show (Ip4 ip4Address) = "ip4: " <> show ip4Address
-  show (Ip6 ip6Address) = "ip6: " <> show ip6Address
+  show (Ip4 ip4Address) = show ip4Address
+  show (Ip6 ip6Address) = show ip6Address
 
 isMulticast :: IpAddress -> Boolean
 isMulticast (Ip4 addr) = uncurry4 (\a _b _c _d -> a .&. 0xf0 == 0xe0) addr
@@ -417,8 +431,8 @@ instance toErl_SocketMode :: ToErl SocketMode where
   toErl BinaryData = unsafeToForeign $ atom "binary"
 
 instance toErl_IpAddress :: ToErl IpAddress where
-  toErl (Ip4 ipAddress) = toErl ipAddress
-  toErl (Ip6 ipAddress) = toErl ipAddress
+  toErl (Ip4 (Ip4Address ipAddress)) = toErl ipAddress
+  toErl (Ip6 (Ip6Address ipAddress)) = toErl ipAddress
 
 instance toErl_SocketAddress :: ToErl SocketAddress where
   toErl (IpAddress ipAddress) = toErl ipAddress
@@ -441,7 +455,7 @@ class OptionToErl sym option where
   optionToErl :: List Foreign -> AtomSymbol.Atom sym -> option -> List Foreign
 
 instance optionToErl_Raw :: OptionToErl "raw" (List Raw) where
-  optionToErl acc _name raws = foldl (\acc raw -> toErl raw : acc) acc raws
+  optionToErl acc _name raws = foldl (\acc' raw -> toErl raw : acc') acc raws
 else instance optionToErl_List :: (IsSymbol name, ToErl a) => OptionToErl name (List a) where
   optionToErl acc name val = (unsafeToForeign $ tuple2 (toAtom name) (toErl <$> val)) : acc
 else instance optionToErl_Other :: (IsSymbol name, ToErl a) => OptionToErl name a where
