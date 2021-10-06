@@ -52,6 +52,8 @@ module Erl.Kernel.Inet
   , ntoa4
   , ntoa6
   , ipMulticastAll
+  , macOsSoReusePort
+  , windowsSoReuseAddr
   , isMulticast
   , getIfAddresses
   , getIp4IfAddresses
@@ -300,9 +302,21 @@ data Raw
 
 derive instance eqRaw :: Eq Raw
 
+ipProtoRaw :: Int
+ipProtoRaw = 0xffff
+
 ipMulticastAll :: Boolean -> Raw
 ipMulticastAll true = Raw 0 49 $ trueSocketOptVal
 ipMulticastAll false = Raw 0 49 $ falseSocketOptVal
+
+macOsSoReusePort :: Boolean -> Raw
+macOsSoReusePort true = Raw ipProtoRaw 0x200 trueSocketOptVal
+macOsSoReusePort false = Raw ipProtoRaw 0x200 falseSocketOptVal
+
+-- Useful on windows since inet_drv.c ignore the reuseaddr option when on windows
+windowsSoReuseAddr :: Boolean -> Raw
+windowsSoReuseAddr true = Raw ipProtoRaw 0x4 trueSocketOptVal
+windowsSoReuseAddr false = Raw ipProtoRaw 0x4 falseSocketOptVal
 
 foreign import trueSocketOptVal :: Binary
 foreign import falseSocketOptVal :: Binary
