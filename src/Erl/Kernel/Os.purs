@@ -6,6 +6,7 @@ module Erl.Kernel.Os
   , OsName(..)
   ) where
 
+import Prelude
 import Effect (Effect)
 import Erl.Atom (Atom)
 
@@ -18,13 +19,19 @@ data OsFamily
   = Unix
   | Windows
 
+derive instance Eq OsFamily
+
 data OsName
   = Linux
   | Darwin
   | WindowsNt
   | Other Atom
 
+derive instance Eq OsName
+
 data OsType
   = OsType OsFamily OsName
+
+derive instance Eq OsType
 
 foreign import osType :: Effect OsType
