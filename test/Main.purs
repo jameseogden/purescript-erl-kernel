@@ -12,7 +12,7 @@ import Effect.Class (liftEffect)
 import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
-import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), HostAddress(..), IpAddress(..), SocketActive(..), SocketAddress(..), ntoa, ntoa4, ntoa6, parseIpAddress)
+import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), SocketActive(..), SocketAddress(..), ntoa, ntoa4, ntoa6, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..))
 import Erl.Kernel.Tcp as Tcp
 import Erl.Kernel.Udp (UdpMessage(..))
@@ -56,7 +56,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
             _ <- liftEffect $ Tcp.send client $ fromBinary $ toBinary "hello"
             msg <- receive
             _ <- liftEffect $ assertEqual { expected: Just $ Tcp client (toBinary "world"), actual: prj msg }
@@ -69,7 +69,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
             liftEffect
               $ do
                   _ <- Tcp.send client $ fromBinary $ toBinary "hello"
@@ -84,7 +84,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
             liftEffect
               $ do
                   _ <- unsafeFromRight "setopts failed" <$> Tcp.setopts client { active: Passive }
@@ -100,7 +100,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
             liftEffect
               $ do
                   _ <- Tcp.send client $ fromBinary $ toBinary "hello"
@@ -137,7 +137,7 @@ udpTests = do
             port2 <- liftEffect $ unsafeFromJust "port failed" <$> Udp.port socket2
             _ <- liftEffect $ Udp.send socket2 (Host "localhost") 8888 (fromBinary (toBinary "hello"))
             message <- receive
-            liftEffect $ assertEqual { actual: message, expected: Udp socket1 (inj (tuple4 127 0 0 1)) port2 (toBinary "hello") }
+            liftEffect $ assertEqual { actual: message, expected: Udp socket1 (inj $ Ip4Address (tuple4 127 0 0 1)) port2 (toBinary "hello") }
     test "passive message test" do
       unsafeRunProcessM
         $ ( ( do
@@ -179,12 +179,12 @@ ipTests = do
   suite "ip tests" do
     test "Can convert valid IPv4 address" do
       let
-        expected = Just $ Ip4 ip4Addr
+        expected = Just $ Ip4 $ Ip4Address ip4Addr
         actual = parseIpAddress validIp4Str
       assertEqual {actual, expected}
     test "Can convert valid IPv6 address" do
       let
-        expected =  Just $ Ip6 ip6Addr
+        expected =  Just $ Ip6 $ Ip6Address ip6Addr
         actual = parseIpAddress validIp6Str
       assertEqual {actual, expected}
     test "Fails on invalid IPv4 address" do
@@ -202,22 +202,22 @@ ipTests = do
     test "Can build string from valid Ip4 address" do
       let
         expected = Just validIp4Str
-        actual = ntoa $ Ip4 ip4Addr
+        actual = ntoa $ Ip4 $ Ip4Address ip4Addr
       assertEqual {actual, expected}
     test "Can build string from valid Ip6 address" do
       let
         expected = Just validIp6Str
-        actual = ntoa $ Ip6 ip6Addr
+        actual = ntoa $ Ip6  $ Ip6Address ip6Addr
       assertEqual {actual, expected}
     test "Can build string from Ip4 tuple" do
       let
         expected = Just validIp4Str
-        actual = ntoa4 $ ip4Addr
+        actual = ntoa4  $ Ip4Address ip4Addr
       assertEqual {actual, expected}
     test "Can build string from Ip6 tuple" do
       let
         expected = Just validIp6Str
-        actual = ntoa6 $ ip6Addr
+        actual = ntoa6 $  Ip6Address ip6Addr
       assertEqual {actual, expected}
   where
     validIp4Str = "123.221.0.255"
