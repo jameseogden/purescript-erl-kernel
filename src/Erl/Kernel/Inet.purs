@@ -25,6 +25,11 @@ module Erl.Kernel.Inet
   , SocketMessages
   , CanGenerateMessages
   , CannotGenerateMessages
+  , InterfaceName
+  , InterfaceFlags(..)
+  , InterfaceAddresses(..)
+  , InterfaceAddressRecord
+  , InterfaceOptions(..)
   , class OptionsValid
   , class Socket
   , send
@@ -46,23 +51,31 @@ module Erl.Kernel.Inet
   , ntoa
   , ntoa4
   , ntoa6
+  , ipMulticastAll
+  , isMulticast
+  , getIfAddresses
+  , getIp4IfAddresses
   ) where
 
 import Prelude
-import Data.Either (Either)
+import Control.Bind (bindFlipped)
+import Data.Either (Either(..), hush)
 import Data.Foldable (foldl)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Int.Bits ((.&.))
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.Show.Generic (genericShow)
 import Data.Symbol (class IsSymbol)
+import Debug.Trace (spy)
 import Effect (Effect)
-import Erl.Atom (atom)
+import Erl.Atom (Atom, atom)
 import Erl.Atom.Symbol (toAtom)
 import Erl.Atom.Symbol as AtomSymbol
 import Erl.Data.Binary (Binary)
 import Erl.Data.Binary.IOData (IOData)
-import Erl.Data.List (List, nil, (:))
-import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4)
+import Erl.Data.List (List, filterMap, nil, (:))
+import Erl.Data.Map (Map, lookup)
+import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4, uncurry4, uncurry8)
 import Erl.Kernel.File as File
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
 import Erl.Untagged.Union (type (|+|), Nil, Union)
@@ -171,6 +184,10 @@ instance showIpAddress :: Show IpAddress where
   show (Ip4 ip4Address) = "ip4: " <> show ip4Address
   show (Ip6 ip6Address) = "ip6: " <> show ip6Address
 
+isMulticast :: IpAddress -> Boolean
+isMulticast (Ip4 addr) = uncurry4 (\a _b _c _d -> a .&. 0xf0 == 0xe0) addr
+isMulticast (Ip6 addr) = uncurry8 (\a _b _c _d _e _f _g _h -> a .&. 0xff00 == 0xff00) addr
+
 type LocalAddress
   = String
 
@@ -181,6 +198,50 @@ data SocketAddress
   | LocalAddress LocalAddress
 
 derive instance eqSocketAddress :: Eq SocketAddress
+
+type InterfaceName
+  = Atom
+
+data InterfaceFlags
+  = IfUp
+  | IfBroadcast
+  | IfLoopback
+  | IfPointToPoint
+  | IfRunning
+  | IfMulticast
+
+type InterfaceAddressRecord ipType
+  = { address :: ipType
+    , netmask :: ipType
+    , broadcastAddress :: Maybe Ip4Address
+    , dstAddress :: Maybe Ip4Address
+    }
+
+data InterfaceAddresses
+  = Ip4InterfaceAddresses (InterfaceAddressRecord Ip4Address)
+  | Ip6InterfaceAddresses (InterfaceAddressRecord Ip6Address)
+
+newtype InterfaceOptions
+  = InterfaceOptions
+  { flags :: List InterfaceFlags
+  , addresses :: Maybe InterfaceAddresses
+  , hwAddress :: Binary
+  }
+
+getIfAddresses :: Effect (Either PosixError (Map InterfaceName (List InterfaceOptions)))
+getIfAddresses = getIfAddressesImpl Left Right
+
+foreign import getIfAddressesImpl ::
+  (PosixError -> Either PosixError (Map InterfaceName (List InterfaceOptions))) ->
+  (Map InterfaceName (List InterfaceOptions) -> Either PosixError (Map InterfaceName (List InterfaceOptions))) ->
+  Effect (Either PosixError (Map InterfaceName (List InterfaceOptions)))
+
+getIp4IfAddresses :: InterfaceName -> Effect (List Ip4Address)
+getIp4IfAddresses name =
+  getIfAddresses <#> hush <#> (bindFlipped (lookup name)) <#> fromMaybe nil <#> filterMap ip4Addr
+  where
+  ip4Addr (InterfaceOptions { addresses: Just (Ip4InterfaceAddresses { address }) }) = Just $ address
+  ip4Addr (InterfaceOptions _) = Nothing
 
 data HostAddress
   = Host Hostname
@@ -225,6 +286,13 @@ data Raw
   = Raw NonNegInt NonNegInt Binary
 
 derive instance eqRaw :: Eq Raw
+
+ipMulticastAll :: Boolean -> Raw
+ipMulticastAll true = Raw 0 49 $ trueSocketOptVal
+ipMulticastAll false = Raw 0 49 $ falseSocketOptVal
+
+foreign import trueSocketOptVal :: Binary
+foreign import falseSocketOptVal :: Binary
 
 data SocketActive
   = Active

@@ -7,6 +7,9 @@
         , parseIpAddress/1
         , ntoa4/1
         , ntoa6/1
+        , trueSocketOptVal/0
+        , falseSocketOptVal/0
+        , getIfAddressesImpl/2
         ]).
 
 %% FFI Helpers
@@ -58,10 +61,8 @@ connectErrorToPursImpl(PosixErr, Other) -> PosixErr(Other).
 
 parseIpAddress(Str) ->
   case inet:parse_address(binary_to_list(Str)) of
-      {ok, Ip} when tuple_size(Ip) == 4 ->
-          ?just(?ip4(Ip));
-      {ok, Ip} when tuple_size(Ip) == 8 ->
-          ?just(?ip6(Ip));
+      {ok, Ip} ->
+          ?just(ipTupleToPurs(Ip));
       _ ->
           ?nothing
   end.
@@ -74,3 +75,119 @@ ntoa4(Addr) ->
 
 ntoa6(Addr) ->
   ntoa4(Addr).
+
+trueSocketOptVal() -> <<1:32/native>>.
+
+falseSocketOptVal() -> <<0:32/native>>.
+
+getIfAddressesImpl(Left, Right) ->
+  fun() ->
+      case inet:getifaddrs() of
+        {ok, Addrs} ->
+          Right(lists:foldl(fun({InterfaceName, Options}, Map) ->
+                              {Current, Acc} =
+                                  lists:foldl(fun({flags, Flags}, undefined) ->
+                                                  {newIfOptsFromFlags(Flags), []};
+                                                 ({flags, Flags}, {Current, Acc}) ->
+                                                  {newIfOptsFromFlags(Flags), [Current | Acc]};
+                                                 ({addr, Addr}, undefined) ->
+                                                  {newIfOptsFromAddr(Addr), []};
+                                                 ({addr, Addr}, {Current = #{address := ?nothing}, Acc}) ->
+                                                  {Current#{address => ?just(Addr)}, Acc};
+                                                 ({addr, Addr}, {Current = #{flags := Flags}, Acc}) ->
+                                                  {newIfOptsFromAddrAndFlags(Addr, Flags), [Current | Acc]};
+                                                 ({netmask, Mask}, {Current, Acc}) ->
+                                                  {Current#{netmask => ?just(Mask)}, Acc};
+                                                 ({broadaddr, Addr}, {Current, Acc}) ->
+                                                  {Current#{broadcastAddress => ?just(Addr)}, Acc};
+                                                 ({dstaddr, Addr}, {Current, Acc}) ->
+                                                  {Current#{dstAddress => ?just(Addr)}, Acc};
+                                                 ({hwaddr, Addr}, {Current, Acc}) ->
+                                                  {Current#{hwAddress => ?just(list_to_binary(Addr))}, Acc}
+                                              end,
+                                              undefined,
+                                              Options),
+                              maps:put(list_to_atom(InterfaceName), lists:map(fun ifOptsToPurs/1, [Current | Acc]), Map)
+                            end,
+                            #{},
+                            Addrs));
+        {error, Posix} ->
+          Left(Posix)
+      end
+  end.
+
+newIfOptsFromAddr(Addr) ->
+  newIfOpts(?just(Addr), []).
+
+newIfOptsFromFlags(Flags) ->
+  newIfOpts(?nothing, ifFlagsToPurs(Flags)).
+
+newIfOptsFromAddrAndFlags(Addr, Flags) ->
+  newIfOpts(?just(Addr), Flags).
+
+newIfOpts(Addr, Flags) ->
+  #{ flags => Flags
+   , address => Addr
+   , netmask => ?nothing
+   , broadcastAddress => ?nothing
+   , dstAddress => ?nothing
+   , hwAddress => ?nothing
+   }.
+
+ifOptsToPurs(#{flags := Flags
+              , address := Addr
+              , netmask := Netmask
+              , broadcastAddress := BroadcastAddr
+              , dstAddress := DestAddr
+              , hwAddress := HwAddr}) ->
+
+  InterfaceAddressType = ifAddressTypes([Addr, Netmask]),
+  #{ flags => Flags
+   , addresses => case InterfaceAddressType of
+                    undefined -> ?nothing;
+                    IpType ->
+                      ?just(Addr2) = Addr,
+                      ?just(Netmask2) = Netmask,
+                      InterfaceAddressType2 = case IpType of
+                                                ip4 -> ip4InterfaceAddresses;
+                                                ip6 -> ip6InterfaceAddresses
+                                              end,
+                      ?just({InterfaceAddressType2, #{ address => Addr2
+                                                     , netmask => Netmask2
+                                                     , broadcastAddress => BroadcastAddr
+                                                     , dstAddress => DestAddr
+                                                     }})
+                  end
+   , hwAddress => HwAddr}.
+
+ifAddressTypes([]) ->
+  undefined;
+ifAddressTypes([?nothing | Tail]) ->
+  ifAddressTypes(Tail);
+ifAddressTypes([?just(Ip) | Tail]) when tuple_size(Ip) == 4 ->
+  ifAddressTypes(Tail, ip4);
+ifAddressTypes([?just(Ip) | Tail]) when tuple_size(Ip) == 8 ->
+  ifAddressTypes(Tail, ip6).
+
+ifAddressTypes([], Type) ->
+  Type;
+ifAddressTypes([?nothing | Tail], Type) ->
+  ifAddressTypes(Tail, Type);
+ifAddressTypes([?just(Ip) | Tail], ip4) when tuple_size(Ip) == 4 ->
+  ifAddressTypes(Tail, ip4);
+ifAddressTypes([?just(Ip) | Tail], ip6) when tuple_size(Ip) == 8 ->
+  ifAddressTypes(Tail, ip6).
+
+ifFlagsToPurs(Flags) ->
+  lists:map(fun(up) -> {ifUp};
+               (broadcast) -> {ifBroadcast};
+               (loopback) -> {ifLoopback};
+               (pointtopoint) -> {ifPointToPoint};
+               (running) -> {ifRunning};
+               (multicast) -> {ifMulticast}
+            end, Flags).
+
+ipTupleToPurs(Ip) when tuple_size(Ip) == 4 ->
+  ?ip4(Ip);
+ipTupleToPurs(Ip) when tuple_size(Ip) == 8 ->
+  ?ip6(Ip).

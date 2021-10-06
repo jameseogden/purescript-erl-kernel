@@ -209,9 +209,11 @@ forcedOptions =
 data OptionToMaybe
   = OptionToMaybe
 
-instance convertOption_OptionToMaybe2 :: ConvertOption OptionToMaybe "mode" a a where
+instance ConvertOption OptionToMaybe "mode" a a where
   convertOption _ _ val = val
-else instance convertOption_OptionToMaybe :: ConvertOption OptionToMaybe sym a (Maybe a) where
+else instance ConvertOption OptionToMaybe sym (Maybe a) (Maybe a) where
+  convertOption _ _ val = val
+else instance ConvertOption OptionToMaybe sym a (Maybe a) where
   convertOption _ _ val = Just val
 
 open ::
