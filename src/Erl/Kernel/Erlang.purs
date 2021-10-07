@@ -15,7 +15,6 @@ module Erl.Kernel.Erlang
   , currentTimeOffset
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
-  , exit
   ) where
 
 import Prelude
