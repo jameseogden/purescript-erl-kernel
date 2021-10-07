@@ -24,7 +24,7 @@ import Data.Maybe (Maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Erl.Atom (Atom)
-import Erl.Process.Raw (Pid, exit)
+import Erl.Process.Raw (Pid)
 import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
 import Foreign (Foreign)
 
