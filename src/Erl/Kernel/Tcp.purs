@@ -31,6 +31,7 @@ module Erl.Kernel.Tcp
   ) where
 
 import Prelude
+
 import ConvertableOptions (class ConvertOption, class ConvertOptionsWithDefaults, convertOptionsWithDefaults)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
@@ -343,9 +344,7 @@ connect ::
 connect address port options timeout = do
   let
     addressErl = toErl address
-
     forced = Record.disjointUnion forcedOptions options
-
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultConnectOptions forced
   liftEffect $ connectImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< connectErrorToPurs) Right addressErl port optionsErl (toErl timeout)
 
@@ -359,11 +358,8 @@ connectPassive ::
 connectPassive address port options timeout = do
   let
     addressErl = toErl address
-
     forced = Record.disjointUnion forcedOptions options
-
     merged = convertOptionsWithDefaults OptionToMaybe defaultConnectOptions forced
-
     optionsErl = optionsToErl merged { active = Just Passive }
   liftEffect $ connectImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< connectErrorToPurs) Right addressErl port optionsErl (toErl timeout)
 
@@ -376,7 +372,6 @@ listen ::
 listen port options = do
   let
     forced = Record.disjointUnion forcedOptions options
-
     optionsErl = optionsToErl $ convertOptionsWithDefaults OptionToMaybe defaultListenOptions forced
   listenImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< listenErrorToPurs) Right port optionsErl
 
@@ -434,7 +429,7 @@ foreign import connectImpl ::
   (Foreign -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
   ((TcpSocket socketMessageBehaviour ConnectedSocket) -> Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket)) ->
   Foreign ->
-  Int ->
+  Port ->
   List Foreign ->
   Foreign ->
   Effect (Either ConnectError (TcpSocket socketMessageBehaviour ConnectedSocket))
@@ -443,7 +438,7 @@ foreign import listenImpl ::
   forall socketMessageBehaviour.
   (Foreign -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket)) ->
   ((TcpSocket socketMessageBehaviour ListenSocket) -> Either ListenError (TcpSocket socketMessageBehaviour ListenSocket)) ->
-  Int ->
+  Port ->
   List Foreign ->
   Effect (Either ListenError (TcpSocket socketMessageBehaviour ListenSocket))
 

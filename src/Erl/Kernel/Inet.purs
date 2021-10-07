@@ -1,9 +1,9 @@
 module Erl.Kernel.Inet
-  ( Port
-  , Octet
+  ( Port(..)
+  , Octet(..)
   , ConnectAddress(..)
   , ConnectError(..)
-  , Hextet
+  , Hextet(..)
   , Hostname
   , PosixError(..)
   , Ip4Address(..)
@@ -17,7 +17,6 @@ module Erl.Kernel.Inet
   , Raw(..)
   , SocketActive(..)
   , SocketMode(..)
-  , SocketDeliver(..)
   , CommonOptions
   , SocketType
   , ListenSocket
@@ -60,6 +59,7 @@ module Erl.Kernel.Inet
   ) where
 
 import Prelude
+
 import Control.Bind (bindFlipped)
 import Data.Either (Either(..), hush)
 import Data.Foldable (foldl)
@@ -90,14 +90,31 @@ import Type.Prelude (Proxy(..))
 type Hostname
   = String
 
-type Port
-  = Int
+newtype Port
+  = Port Int
 
-type Octet
-  = Int
+derive instance Eq Port
+instance Show Port where
+  show (Port port) = "port: " <> show port
+derive instance Newtype Port _
+instance RuntimeType Port RTInt
 
-type Hextet
-  = Int
+newtype Octet
+  = Octet Int
+derive instance Eq Octet
+instance Show Octet where
+  show (Octet octet) = "octet: " <> show octet
+derive instance Newtype Octet _
+instance RuntimeType Octet RTInt
+
+
+newtype Hextet
+  = Hextet Int
+derive instance Eq Hextet
+instance Show Hextet where
+  show (Hextet hextet) = "hextet: " <> show hextet
+derive instance Newtype Hextet _
+instance RuntimeType Hextet RTInt
 
 data SocketType
 
@@ -154,10 +171,10 @@ data PosixError
   | EXbadseq
   | File File.PosixError
 
-derive instance eq_PosixError :: Eq PosixError
+derive instance Eq PosixError
 
---derive instance generic_PosixError :: Generic PosixError _
-instance show_PosixError :: Show PosixError where
+--derive instance Generic PosixError _
+instance Show PosixError where
   show _ = "inet posix"
 
 posixErrorToPurs :: Foreign -> Maybe PosixError
@@ -170,8 +187,8 @@ foreign import posixErrorToPursImpl :: Foreign -> Maybe PosixError
 newtype Ip4Address
   = Ip4Address (Tuple4 Octet Octet Octet Octet)
 
-derive instance eqIp4Address :: Eq Ip4Address
-instance showIp4Address :: Show Ip4Address where
+derive instance Eq Ip4Address
+instance Show Ip4Address where
   show (Ip4Address ip4Address) = "ip4: " <> show ip4Address
 
 derive instance Newtype Ip4Address _
@@ -181,7 +198,7 @@ newtype Ip6Address
   = Ip6Address (Tuple8 Hextet Hextet Hextet Hextet Hextet Hextet Hextet Hextet)
 
 derive instance Eq Ip6Address
-instance showIp6Address :: Show Ip6Address where
+instance Show Ip6Address where
   show (Ip6Address ip6Address) = "ip6: " <> show ip6Address
 derive instance Newtype Ip6Address _
 instance RuntimeType Ip6Address (RTTuple8 RTInt RTInt RTInt RTInt RTInt RTInt RTInt RTInt)
@@ -193,15 +210,15 @@ data IpAddress
 type IpAddressUnion
   = Union (Ip4Address |+| Ip6Address |+| Nil)
 
-derive instance eqIpAddress :: Eq IpAddress
+derive instance Eq IpAddress
 
-instance showIpAddress :: Show IpAddress where
+instance Show IpAddress where
   show (Ip4 ip4Address) = show ip4Address
   show (Ip6 ip6Address) = show ip6Address
 
 isMulticast :: IpAddress -> Boolean
-isMulticast (Ip4 (Ip4Address addr)) = uncurry4 (\a _b _c _d -> a .&. 0xf0 == 0xe0) addr
-isMulticast (Ip6 (Ip6Address addr)) = uncurry8 (\a _b _c _d _e _f _g _h -> a .&. 0xff00 == 0xff00) addr
+isMulticast (Ip4 (Ip4Address addr)) = uncurry4 (\(Octet a) _b _c _d -> a .&. 0xf0 == 0xe0) addr
+isMulticast (Ip6 (Ip6Address addr)) = uncurry8 (\(Hextet a) _b _c _d _e _f _g _h -> a .&. 0xff00 == 0xff00) addr
 
 type LocalAddress
   = String
@@ -212,7 +229,7 @@ data SocketAddress
   | Loopback
   | LocalAddress LocalAddress
 
-derive instance eqSocketAddress :: Eq SocketAddress
+derive instance Eq SocketAddress
 
 type InterfaceName
   = Atom
@@ -262,9 +279,9 @@ data HostAddress
   = Host Hostname
   | Ip IpAddress
 
-derive instance eqHostAddress :: Eq HostAddress
+derive instance Eq HostAddress
 
-instance showHostAddress :: Show HostAddress where
+instance Show HostAddress where
   show (Host hostName) = "Host " <> show hostName
   show (Ip ipAddress) = "Ip" <> show ipAddress
 
@@ -272,7 +289,7 @@ data ConnectAddress
   = SocketAddr SocketAddress
   | HostAddr HostAddress
 
-instance toErl_ConnectAddress :: ToErl ConnectAddress where
+instance ToErl ConnectAddress where
   toErl (SocketAddr socketAddress) = toErl socketAddress
   toErl (HostAddr hostAddress) = toErl hostAddress
 
@@ -280,11 +297,11 @@ data ConnectError
   = ConnectTimeout
   | ConnectPosix PosixError
 
-derive instance eq_ConnectError :: Eq ConnectError
+derive instance Eq ConnectError
 
-derive instance generic_ConnectError :: Generic ConnectError _
+derive instance Generic ConnectError _
 
-instance show_ConnectError :: Show ConnectError where
+instance Show ConnectError where
   show = genericShow
 
 connectErrorToPurs :: Foreign -> Maybe ConnectError
@@ -295,12 +312,12 @@ data AddressFamily
   | Inet6
   | Local
 
-derive instance eqAddressFamily :: Eq AddressFamily
+derive instance Eq AddressFamily
 
 data Raw
   = Raw NonNegInt NonNegInt Binary
 
-derive instance eqRaw :: Eq Raw
+derive instance Eq Raw
 
 ipProtoRaw :: Int
 ipProtoRaw = 0xffff
@@ -327,24 +344,17 @@ data SocketActive
   | Once
   | N Int
 
-derive instance eqSocketActive :: Eq SocketActive
+derive instance Eq SocketActive
 
 data SocketMode
   = ListData
   | BinaryData
 
-derive instance eqSocketMode :: Eq SocketMode
-
-data SocketDeliver
-  = Port
-  | Term
-
-derive instance eqSocketDeliver :: Eq SocketDeliver
+derive instance Eq SocketMode
 
 type CommonOptions r
   = ( active :: Maybe SocketActive
     , buffer :: Maybe NonNegInt
-    , deliver :: Maybe SocketDeliver
     , dontroute :: Maybe Boolean
     , header :: Maybe NonNegInt
     , high_msgq_watermark :: Maybe NonNegInt
@@ -372,7 +382,6 @@ defaultCommonOptions r =
   Record.union r
     { active: Nothing
     , buffer: Nothing
-    , deliver: Nothing
     , dontroute: Nothing
     , header: Nothing
     , high_msgq_watermark: Nothing
@@ -395,11 +404,11 @@ data SendError
   = SendClosed
   | SendPosix PosixError
 
-derive instance eq_SendError :: Eq SendError
+derive instance Eq SendError
 
-derive instance generic_SendError :: Generic SendError _
+derive instance Generic SendError _
 
-instance show_SendError :: Show SendError where
+instance Show SendError where
   show = genericShow
 
 sendErrorToPurs :: Foreign -> Maybe SendError
@@ -410,11 +419,11 @@ data ActiveError
   | ActiveTimeout
   | ActivePosix PosixError
 
-derive instance eq_ActiveError :: Eq ActiveError
+derive instance Eq ActiveError
 
-derive instance generic_ActiveError :: Generic ActiveError _
+derive instance Generic ActiveError _
 
-instance show_ActiveError :: Show ActiveError where
+instance Show ActiveError where
   show = genericShow
 
 activeErrorToPurs :: Foreign -> Maybe ActiveError
@@ -427,37 +436,48 @@ optionsToErl ::
   Record r -> List Foreign
 optionsToErl = makeTerms (Proxy :: _ rl)
 
-instance toErl_Raw :: ToErl Raw where
+instance ToErl Raw where
   toErl (Raw protocol optionNum val) = unsafeToForeign $ tuple4 (atom "raw") protocol optionNum val
 
-instance toErl_HostAddress :: ToErl HostAddress where
+instance ToErl HostAddress where
   toErl (Host hostname) = unsafeToForeign $ hostname
   toErl (Ip ipAddress) = toErl ipAddress
 
-instance toErl_AddressFamily :: ToErl AddressFamily where
+instance ToErl AddressFamily where
   toErl Inet4 = unsafeToForeign $ atom "inet4"
   toErl Inet6 = unsafeToForeign $ atom "inet6"
   toErl Local = unsafeToForeign $ atom "local"
 
-instance toErl_SocketMode :: ToErl SocketMode where
+instance ToErl SocketMode where
   toErl ListData = unsafeToForeign $ atom "list"
   toErl BinaryData = unsafeToForeign $ atom "binary"
 
-instance toErl_IpAddress :: ToErl IpAddress where
-  toErl (Ip4 (Ip4Address ipAddress)) = toErl ipAddress
-  toErl (Ip6 (Ip6Address ipAddress)) = toErl ipAddress
+instance ToErl Port where
+  toErl (Port port) = toErl port
 
-instance toErl_SocketAddress :: ToErl SocketAddress where
+instance ToErl Octet where
+  toErl (Octet octet) = toErl octet
+
+instance ToErl Hextet where
+  toErl (Hextet hextet) = toErl hextet
+
+instance ToErl Ip4Address where
+  toErl (Ip4Address ipAddress) = toErl ipAddress
+
+instance ToErl Ip6Address where
+  toErl (Ip6Address ipAddress) = toErl ipAddress
+
+instance ToErl IpAddress where
+  toErl (Ip4 ipAddress) = toErl ipAddress
+  toErl (Ip6 ipAddress) = toErl ipAddress
+
+instance ToErl SocketAddress where
   toErl (IpAddress ipAddress) = toErl ipAddress
   toErl (LocalAddress localAddress) = toErl localAddress
   toErl Any = unsafeToForeign $ atom "any"
   toErl Loopback = unsafeToForeign $ atom "loopback"
 
-instance toErl_SocketDeliver :: ToErl SocketDeliver where
-  toErl Port = unsafeToForeign $ atom "port"
-  toErl Term = unsafeToForeign $ atom "term"
-
-instance toErl_SocketActive :: ToErl SocketActive where
+instance ToErl SocketActive where
   toErl Active = unsafeToForeign $ atom "true"
   toErl Passive = unsafeToForeign $ atom "false"
   toErl Once = unsafeToForeign $ atom "once"
@@ -467,21 +487,21 @@ class OptionToErl :: Symbol -> Type -> Constraint
 class OptionToErl sym option where
   optionToErl :: List Foreign -> AtomSymbol.Atom sym -> option -> List Foreign
 
-instance optionToErl_Raw :: OptionToErl "raw" (List Raw) where
+instance OptionToErl "raw" (List Raw) where
   optionToErl acc _name raws = foldl (\acc' raw -> toErl raw : acc') acc raws
-else instance optionToErl_List :: (IsSymbol name, ToErl a) => OptionToErl name (List a) where
+else instance (IsSymbol name, ToErl a) => OptionToErl name (List a) where
   optionToErl acc name val = (unsafeToForeign $ tuple2 (toAtom name) (toErl <$> val)) : acc
-else instance optionToErl_Other :: (IsSymbol name, ToErl a) => OptionToErl name a where
+else instance (IsSymbol name, ToErl a) => OptionToErl name a where
   optionToErl acc name val = (unsafeToForeign $ tuple2 (toAtom name) (toErl val)) : acc
 
 class OptionsToErl :: Row Type -> RL.RowList Type -> Constraint
 class OptionsToErl r rl where
   makeTerms :: Proxy rl -> Record r -> List Foreign
 
-instance optionsToErl_nil :: OptionsToErl r RL.Nil where
+instance OptionsToErl r RL.Nil where
   makeTerms _ _r = nil
 
-instance optionsToErl_consMaybe ::
+instance
   ( IsSymbol sym
   , Row.Cons sym (Maybe a) t1 r
   , OptionsToErl r tail
@@ -492,7 +512,7 @@ instance optionsToErl_consMaybe ::
     let
       tail = makeTerms (Proxy :: _ tail) r
     maybe tail (optionToErl tail (AtomSymbol.atom :: AtomSymbol.Atom sym)) $ Record.get (Proxy :: _ sym) r
-else instance optionsToErl_cons ::
+else instance
   ( IsSymbol sym
   , Row.Cons sym a t1 r
   , OptionsToErl r tail

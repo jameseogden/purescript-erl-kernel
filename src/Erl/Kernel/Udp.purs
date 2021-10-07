@@ -289,7 +289,7 @@ foreign import openImpl ::
   forall socketMessageBehaviour.
   (Foreign -> Either OpenError (UdpSocket socketMessageBehaviour)) ->
   (UdpSocket socketMessageBehaviour -> Either OpenError (UdpSocket socketMessageBehaviour)) ->
-  Int ->
+  Port ->
   List Foreign ->
   Effect (Either OpenError (UdpSocket socketMessageBehaviour))
 
@@ -299,7 +299,7 @@ foreign import sendImpl ::
   (Unit -> Either SendError Unit) ->
   UdpSocket socketMessageBehaviour ->
   Foreign ->
-  Int ->
+  Port ->
   IOData ->
   Effect (Either SendError Unit)
 
