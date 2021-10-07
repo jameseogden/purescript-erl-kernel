@@ -1,7 +1,7 @@
 -module(erl_kernel_erlang@foreign).
 
 -export([ makeRef/0
-        , sleep/1
+        , sleep_/1
         , utcNowMs/0
         , vmNowMs/0
         , utcNowUs/0
@@ -21,7 +21,7 @@ makeRef() ->
       make_ref()
   end.
 
-sleep(Ms) ->
+sleep_(Ms) ->
   fun() ->
       timer:sleep(Ms),
       unit

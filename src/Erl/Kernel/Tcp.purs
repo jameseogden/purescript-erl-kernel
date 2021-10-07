@@ -79,11 +79,11 @@ instance Show (TcpSocket PassiveSocket ListenSocket) where
 
 foreign import showSocketImpl :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehaviour socketType -> String
 
-instance Socket (TcpSocket ActiveSocket) where
+instance Socket (TcpSocket ActiveSocket ConnectedSocket) where
   send = send
   recv = recv
   close = close
-instance Socket (TcpSocket PassiveSocket) where
+instance Socket (TcpSocket PassiveSocket ConnectedSocket) where
   send = send
   recv = recv
   close = close

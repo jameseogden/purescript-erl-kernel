@@ -3,6 +3,7 @@
 -export([ openImpl/4
         , sendImpl/6
         , recvImpl/5
+        , closeImpl/1
         , portImpl/1
         , setoptsImpl/4
         , eqSocketImpl/2
@@ -46,6 +47,13 @@ recvImpl(Left, Data, DataAnc, Socket, Timeout) ->
                     Left(Reason)
             end
     end.
+
+closeImpl(Socket) ->
+    fun() ->
+            ok = gen_udp:close(Socket),
+            unit
+    end.
+
 
 portImpl(Socket) ->
     fun() ->

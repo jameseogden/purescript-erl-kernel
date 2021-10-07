@@ -10,13 +10,13 @@ cmdImpl(Command) -> fun() ->
 
 osType() ->
     fun() ->
-            {osFamily, osName} = os:type(),
+            {OsFamily, OsName} = os:type(),
             { osType
-            , case osFamily of
+            , case OsFamily of
                   unix -> {unix};
                  win32 -> {windows}
               end
-            , case osName of
+            , case OsName of
                   darwin -> {darwin};
                   linux -> {linux};
                   nt -> {windowNt};

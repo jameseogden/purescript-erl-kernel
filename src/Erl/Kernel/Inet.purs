@@ -117,11 +117,11 @@ instance OptionsValid ActiveSocket options
 instance (Row.Lacks "active" options) => OptionsValid PassiveSocket options
 
 class Socket socket where
-  send :: socket ConnectedSocket -> IOData -> Effect (Either SendError Unit)
+  send :: socket -> IOData -> Effect (Either SendError Unit)
 
-  recv :: socket ConnectedSocket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
+  recv :: socket -> NonNegInt -> Timeout -> Effect (Either ActiveError Binary)
 
-  close :: forall socketType. socket socketType -> Effect Unit
+  close :: socket -> Effect Unit
 
 data PosixError
   = EAddrinuse

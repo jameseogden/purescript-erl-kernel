@@ -13,6 +13,7 @@ module Erl.Kernel.Udp
   , openPassive
   , send
   , recv
+  , close
   , port
   , setopts
   , convertPassiveToActive
@@ -265,6 +266,9 @@ recv :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Timeo
 recv socket timeout = do
   recvImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< receiveErrorToPurs) (mkFn3 (\a b c -> Right $ Data a b c)) (mkFn4 (\a b c d -> Right $ DataAnc a b c d)) socket (toErl timeout)
 
+close :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect Unit
+close = closeImpl
+
 port :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect (Maybe Port)
 port = portImpl
 
@@ -307,6 +311,8 @@ foreign import recvImpl ::
   UdpSocket socketMessageBehaviour ->
   Foreign ->
   Effect (Either ReceiveError UdpRecvData)
+
+foreign import closeImpl :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect Unit
 
 foreign import portImpl :: forall socketMessageBehaviour. UdpSocket socketMessageBehaviour -> Effect (Maybe Port)
 

@@ -15,6 +15,7 @@ module Erl.Kernel.Erlang
   , currentTimeOffset
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
+  , exit
   ) where
 
 import Prelude
@@ -24,8 +25,8 @@ import Data.Maybe (Maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Erl.Atom (Atom)
-import Erl.Process.Raw (Pid)
-import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Ref, StrictlyMonotonicInt(..), TimeOffset(..))
+import Erl.Process.Raw (Pid, exit)
+import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
 import Foreign (Foreign)
 
 foreign import makeRef :: Effect Ref
@@ -38,7 +39,10 @@ foreign import vmNowMs :: Effect Microsecond
 
 foreign import vmNowUs :: Effect Microsecond
 
-foreign import sleep :: FfiMilliseconds -> Effect Unit
+sleep :: Milliseconds -> Effect Unit
+sleep ms = sleep_ (toFfiMilliseconds ms)
+
+foreign import sleep_ :: FfiMilliseconds -> Effect Unit
 
 foreign import termToString :: Foreign -> String
 
