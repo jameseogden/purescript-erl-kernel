@@ -1,4 +1,6 @@
-.PHONY: ps erl all test repl
+.PHONY: ps erl all test
+
+.DEFAULT_GOAL := ps
 
 all: test
 
