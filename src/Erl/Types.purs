@@ -21,7 +21,7 @@ module Erl.Types
   ) where
 
 import Prelude
-import Data.Int (floor, round, toNumber)
+import Data.Int (round, toNumber)
 import Data.Newtype (class Newtype)
 import Data.Time.Duration as Duration
 import Erl.Atom (atom)

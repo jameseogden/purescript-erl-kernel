@@ -1,11 +1,13 @@
 module Test.Main where
 
 import Prelude
+
 import Control.Monad.Free (Free)
 import Data.Either (Either(..), fromRight')
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromMaybe')
 import Data.Show.Generic (genericShow)
+import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
 import Erl.Data.Binary.IOData (fromBinary)
@@ -55,7 +57,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout $ Milliseconds 1000.0)
             _ <- liftEffect $ Tcp.send client $ fromBinary $ toBinary "hello"
             msg <- receive
             _ <- liftEffect $ assertEqual { expected: Just $ Tcp client (toBinary "world"), actual: prj msg }
@@ -68,7 +70,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout $ Milliseconds 1000.0)
             liftEffect
               $ do
                   _ <- Tcp.send client $ fromBinary $ toBinary "hello"
@@ -83,7 +85,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout $ Milliseconds 1000.0)
             liftEffect
               $ do
                   _ <- unsafeFromRight "setopts failed" <$> Tcp.setopts client { active: Passive }
@@ -99,7 +101,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout 1000)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 { active: Passive } (Timeout $ Milliseconds  1000.0)
             _ <- liftEffect $ setopts client { active: Passive } -- this is a noop since it's already an active socket, but it is proving that the compiler allows us to change the option
             liftEffect
               $ do
@@ -117,7 +119,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- liftEffect $ unsafeFromRight "connect failed" <$> Tcp.connectPassive (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout 1000)
+            client <- liftEffect $ unsafeFromRight "connect failed" <$> Tcp.connectPassive (SocketAddr (IpAddress (Ip4 $ Ip4Address $ tuple4 127 0 0 1))) 8080 {} (Timeout $ Milliseconds  1000.0)
             _ <- liftEffect $ setopts client { reuseaddr: true } -- this is pointless since the socket is connected, but it is proving that the compiler allows us to change some options
             --_ <- liftEffect $ setopts client { active: Active } -- this is not valid, the compiler enforces that you cannot set 'active' on a connectPassive socket
 
