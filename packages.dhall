@@ -27,5 +27,10 @@ in  upstream
         , "prelude"
         , "unsafe-coerce"
         ]
-        ,   version = "eb7a10c7930c4b99f1a6bfce767daa814d45dd2b"
+        , version = "57f8aad9d2bd0a980dbd6ab3136f8d1edd16a1ad"
+        }
+ with erl-binary =
+        { repo = "https://github.com/id3as/purescript-erl-binary.git"
+        , dependencies = [ "erl-lists", "maybe", "prelude" ]
+        , version = "e3a5da78a9264a800eb7bad918a58de5ac57ba4c"
         }

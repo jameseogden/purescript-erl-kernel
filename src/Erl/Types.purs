@@ -11,6 +11,8 @@ module Erl.Types
   , Timeout(..)
   , IntOrInfinity(..)
   , Ref
+  , Octet(..)
+  , Hextet(..)
   , class ToErl
   , toErl
   , addMilliseconds
@@ -18,16 +20,21 @@ module Erl.Types
   , FfiMilliseconds -- Don't export the constructor
   , toFfiMilliseconds
   , fromFfiMilliseconds
+  , octet
+  , hextet
   ) where
 
 import Prelude
-
+import Data.Generic.Rep (class Generic)
 import Data.Int (round, toNumber)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Data.Time.Duration as Duration
 import Erl.Atom (atom)
 import Erl.Data.Binary (Binary)
 import Erl.Data.Tuple (Tuple2, Tuple3, Tuple4, Tuple5, Tuple6, Tuple7, Tuple8, tuple2, tuple3, tuple4, tuple5, tuple6, tuple7, tuple8, uncurry2, uncurry3, uncurry4, uncurry5, uncurry6, uncurry7, uncurry8)
+import Erl.Untagged.Union (class RuntimeType, RTInt)
 import Foreign (Foreign, unsafeToForeign)
 
 type NonNegInt
@@ -37,6 +44,42 @@ type PosInt
   = Int
 
 foreign import data Ref :: Type
+
+newtype Octet
+  = Octet Int
+
+derive instance Generic Octet _
+derive instance Eq Octet
+instance Show Octet where
+  show = genericShow
+derive instance Newtype Octet _
+instance RuntimeType Octet RTInt
+
+instance ToErl Octet where
+  toErl (Octet o) = toErl o
+
+octet :: Int -> Maybe Octet
+octet i
+  | i >= 0, i <= 255 = Just $ Octet i
+  | otherwise = Nothing
+
+newtype Hextet
+  = Hextet Int
+
+derive instance Eq Hextet
+derive instance Generic Hextet _
+instance Show Hextet where
+  show = genericShow
+derive instance Newtype Hextet _
+instance RuntimeType Hextet RTInt
+
+instance ToErl Hextet where
+  toErl (Hextet h) = toErl h
+
+hextet :: Int -> Maybe Hextet
+hextet i
+  | i >= 0, i <= 65535 = Just $ Hextet i
+  | otherwise = Nothing
 
 newtype MonotonicTime
   = MonotonicTime Int
@@ -199,44 +242,37 @@ instance toErl_Binary :: ToErl Binary where
 
 instance ToErl (Tuple2 Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2) => ToErl (Tuple2 a1 a2) where
+else instance (ToErl a1, ToErl a2) => ToErl (Tuple2 a1 a2) where
   toErl val = unsafeToForeign $ uncurry2 (\a1 a2 -> tuple2 (toErl a1) (toErl a2)) val
 
 instance ToErl (Tuple3 Int Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2, ToErl a3) => ToErl (Tuple3 a1 a2 a3) where
+else instance (ToErl a1, ToErl a2, ToErl a3) => ToErl (Tuple3 a1 a2 a3) where
   toErl val = unsafeToForeign $ uncurry3 (\a1 a2 a3 -> tuple3 (toErl a1) (toErl a2) (toErl a3)) val
 
 instance ToErl (Tuple4 Int Int Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4) => ToErl (Tuple4 a1 a2 a3 a4) where
+else instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4) => ToErl (Tuple4 a1 a2 a3 a4) where
   toErl val = unsafeToForeign $ uncurry4 (\a1 a2 a3 a4 -> tuple4 (toErl a1) (toErl a2) (toErl a3) (toErl a4)) val
 
 instance ToErl (Tuple5 Int Int Int Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5) => ToErl (Tuple5 a1 a2 a3 a4 a5) where
+else instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5) => ToErl (Tuple5 a1 a2 a3 a4 a5) where
   toErl val = unsafeToForeign $ uncurry5 (\a1 a2 a3 a4 a5 -> tuple5 (toErl a1) (toErl a2) (toErl a3) (toErl a4) (toErl a5)) val
 
 instance ToErl (Tuple6 Int Int Int Int Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5, ToErl a6) => ToErl (Tuple6 a1 a2 a3 a4 a5 a6) where
+else instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5, ToErl a6) => ToErl (Tuple6 a1 a2 a3 a4 a5 a6) where
   toErl val = unsafeToForeign $ uncurry6 (\a1 a2 a3 a4 a5 a6 -> tuple6 (toErl a1) (toErl a2) (toErl a3) (toErl a4) (toErl a5) (toErl a6)) val
 
 instance ToErl (Tuple7 Int Int Int Int Int Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5, ToErl a6, ToErl a7) => ToErl (Tuple7 a1 a2 a3 a4 a5 a6 a7) where
+else instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5, ToErl a6, ToErl a7) => ToErl (Tuple7 a1 a2 a3 a4 a5 a6 a7) where
   toErl val = unsafeToForeign $ uncurry7 (\a1 a2 a3 a4 a5 a6 a7 -> tuple7 (toErl a1) (toErl a2) (toErl a3) (toErl a4) (toErl a5) (toErl a6) (toErl a7)) val
 
 instance ToErl (Tuple8 Int Int Int Int Int Int Int Int) where
   toErl = unsafeToForeign
-else
-instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5, ToErl a6, ToErl a7, ToErl a8) => ToErl (Tuple8 a1 a2 a3 a4 a5 a6 a7 a8) where
+else instance (ToErl a1, ToErl a2, ToErl a3, ToErl a4, ToErl a5, ToErl a6, ToErl a7, ToErl a8) => ToErl (Tuple8 a1 a2 a3 a4 a5 a6 a7 a8) where
   toErl val = unsafeToForeign $ uncurry8 (\a1 a2 a3 a4 a5 a6 a7 a8 -> tuple8 (toErl a1) (toErl a2) (toErl a3) (toErl a4) (toErl a5) (toErl a6) (toErl a7) (toErl a8)) val
 
 -- instance toErl_Record ::

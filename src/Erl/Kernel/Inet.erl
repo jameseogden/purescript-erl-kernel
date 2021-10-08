@@ -5,6 +5,8 @@
         , activeErrorToPursImpl/2
         , connectErrorToPursImpl/2
         , parseIpAddress/1
+        , parseIp4Address/1
+        , parseIp6Address/1
         , ntoa4/1
         , ntoa6/1
         , trueSocketOptVal/0
@@ -67,10 +69,26 @@ parseIpAddress(Str) ->
           ?nothing
   end.
 
+parseIp4Address(Str) ->
+  case inet:parse_ipv4_address(binary_to_list(Str)) of
+      {ok, Ip} ->
+          ?just(Ip);
+      _ ->
+          ?nothing
+  end.
+
+parseIp6Address(Str) ->
+  case inet:parse_ipv6_address(binary_to_list(Str)) of
+      {ok, Ip} ->
+          ?just(Ip);
+      _ ->
+          ?nothing
+  end.
+
+
 ntoa4(Addr) ->
   case inet:ntoa(Addr) of
-    Str when is_list(Str) -> ?just(list_to_binary(Str));
-    _ -> ?nothing
+    Str when is_list(Str) -> list_to_binary(Str)
   end.
 
 ntoa6(Addr) ->

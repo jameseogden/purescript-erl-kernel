@@ -7,6 +7,7 @@ module Erl.Kernel.Erlang
   , sleep
   , termToString
   , eqFfi
+  , listToBinary
   , monitor
   , monotonicTime
   , monotonicStartTime
@@ -24,8 +25,10 @@ import Data.Maybe (Maybe)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Erl.Atom (Atom)
+import Erl.Data.Binary (Binary)
+import Erl.Data.List (List)
 import Erl.Process.Raw (Pid)
-import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
+import Erl.Types (FfiMilliseconds, Microsecond, MonotonicTime(..), NativeTime(..), Octet, Ref, StrictlyMonotonicInt(..), TimeOffset(..), toFfiMilliseconds)
 import Foreign (Foreign)
 
 foreign import makeRef :: Effect Ref
@@ -37,6 +40,8 @@ foreign import utcNowUs :: Effect Microsecond
 foreign import vmNowMs :: Effect Microsecond
 
 foreign import vmNowUs :: Effect Microsecond
+
+foreign import listToBinary :: List Octet -> Binary
 
 sleep :: Milliseconds -> Effect Unit
 sleep ms = sleep_ (toFfiMilliseconds ms)

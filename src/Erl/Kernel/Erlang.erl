@@ -8,6 +8,7 @@
         , vmNowUs/0
         , termToString/1
         , eqFfi/2
+        , listToBinary/1
         , monitor/2
         , monotonicTime_/1
         , monotonicStartTime_/1
@@ -31,6 +32,9 @@ utcNowMs() ->
   fun() ->
       erlang:system_time(millisecond)
   end.
+
+listToBinary(List) ->
+  list_to_binary(List).
 
 vmNowMs() ->
   fun() ->

@@ -1,7 +1,6 @@
 module Test.Main where
 
 import Prelude
-
 import Control.Monad.Free (Free)
 import Data.Either (Either(..), fromRight')
 import Data.Generic.Rep (class Generic)
@@ -13,14 +12,14 @@ import Effect.Class (liftEffect)
 import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
-import Erl.Kernel.Inet (ActiveError(..), ConnectAddress(..), Hextet(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Octet(..), Port(..), SocketActive(..), SocketAddress(..), ntoa, ntoa4, ntoa6, parseIpAddress)
+import Erl.Kernel.Inet (ActiveError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
 import Erl.Kernel.Udp (UdpMessage(..))
 import Erl.Kernel.Udp as Udp
 import Erl.Process (Process, ProcessM, receive, self, spawnLink, unsafeRunProcessM, (!))
 import Erl.Test.EUnit (TestF, runTests, suite, test)
-import Erl.Types (Timeout(..))
+import Erl.Types (Hextet(..), Octet(..), Timeout(..))
 import Erl.Untagged.Union (class RuntimeType, type (|$|), type (|+|), Nil, RTLiteralAtom, RTOption, RTTuple1, Union, inj, prj)
 import Partial.Unsafe (unsafeCrashWith)
 import Test.Assert (assertEqual, assertTrue)
@@ -57,7 +56,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect loopbackConnectAddress (Port 8080) {} (Timeout $ Milliseconds 1000.0)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect connectIp4Loopback (Port 8080) {} (Timeout $ Milliseconds 1000.0)
             _ <- liftEffect $ Tcp.send client $ fromBinary $ toBinary "hello"
             msg <- receive
             _ <- liftEffect $ assertEqual { expected: Just $ Tcp client (toBinary "world"), actual: prj msg }
@@ -70,7 +69,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect loopbackConnectAddress (Port 8080) { active: Passive } (Timeout $ Milliseconds 1000.0)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect connectIp4Loopback (Port 8080) { active: Passive } (Timeout $ Milliseconds 1000.0)
             liftEffect
               $ do
                   _ <- Tcp.send client $ fromBinary $ toBinary "hello"
@@ -85,7 +84,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect loopbackConnectAddress (Port 8080) {} (Timeout $ Milliseconds 1000.0)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect connectIp4Loopback (Port 8080) {} (Timeout $ Milliseconds 1000.0)
             liftEffect
               $ do
                   _ <- unsafeFromRight "setopts failed" <$> Tcp.setopts client { active: Passive }
@@ -101,7 +100,7 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- unsafeFromRight "connect failed" <$> Tcp.connect loopbackConnectAddress (Port 8080) { active: Passive } (Timeout $ Milliseconds  1000.0)
+            client <- unsafeFromRight "connect failed" <$> Tcp.connect connectIp4Loopback (Port 8080) { active: Passive } (Timeout $ Milliseconds 1000.0)
             _ <- liftEffect $ setopts client { active: Passive } -- this is a noop since it's already an active socket, but it is proving that the compiler allows us to change the option
             liftEffect
               $ do
@@ -119,10 +118,9 @@ tcpTests = do
             _server <- liftEffect $ spawnLink $ server self
             ready <- receive
             liftEffect $ assertEqual { actual: prj ready, expected: Just Ready }
-            client <- liftEffect $ unsafeFromRight "connect failed" <$> Tcp.connectPassive loopbackConnectAddress (Port 8080) {} (Timeout $ Milliseconds  1000.0)
+            client <- liftEffect $ unsafeFromRight "connect failed" <$> Tcp.connectPassive connectIp4Loopback (Port 8080) {} (Timeout $ Milliseconds 1000.0)
             _ <- liftEffect $ setopts client { reuseaddr: true } -- this is pointless since the socket is connected, but it is proving that the compiler allows us to change some options
             --_ <- liftEffect $ setopts client { active: Active } -- this is not valid, the compiler enforces that you cannot set 'active' on a connectPassive socket
-
             liftEffect
               $ do
                   _ <- Tcp.send client $ fromBinary $ toBinary "hello"
@@ -153,50 +151,72 @@ udpTests = do
   suite "udp tests" do
     test "active message test" do
       unsafeRunProcessM
-        $ do
-            socket1 <- unsafeFromRight "open failed" <$> Udp.open (Port 8888) { reuseaddr: true }
-            socket2 <- unsafeFromRight "open failed" <$> Udp.open (Port 0) {}
-            port2 <- liftEffect $ unsafeFromJust "port failed" <$> Udp.port socket2
-            _ <- liftEffect $ Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
-            message <- receive
-            liftEffect $ assertEqual { actual: message
-                                     , expected: Udp socket1 (inj ip4Loopback) port2 (toBinary "hello")
-                                     }
-    test "passive message test" do
+        ( ( do
+              socket1 <- unsafeFromRight "open failed" <$> Udp.open (Port 8888) { reuseaddr: true }
+              socket2 <- unsafeFromRight "open failed" <$> Udp.open (Port 0) {}
+              port2 <- liftEffect $ unsafeFromJust "port failed" <$> Udp.port socket2
+              _ <- liftEffect $ Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
+              message <- receive
+              liftEffect
+                $ assertEqual
+                    { actual: message
+                    , expected: inj $ Udp socket1 (inj ip4Loopback) port2 (toBinary "hello")
+                    }
+          ) ::
+            ProcessM (Union |$| UdpMessage |+| Nil) Unit
+        )
+    test "Active socket in passive mode test" do
       unsafeRunProcessM
-        $ ( ( do
-                socket1 <- unsafeFromRight "open failed" <$> Udp.open (Port 8888) { reuseaddr: true, active: Passive }
-                socket2 <- unsafeFromRight "open failed" <$> Udp.open (Port 0) {}
-                liftEffect
-                  $ do
-                      _ <- Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
-                      recvData <- unsafeFromRight "recv failed" <$> Udp.recv socket1 InfiniteTimeout
-                      let
-                        payload = case recvData of
-                          Udp.Data _ _ p -> Just p
-                          Udp.DataAnc _ _ _ _ -> Nothing
-                      assertTrue $ payload == (Just $ toBinary "hello")
-            ) ::
-              ProcessM UdpMessage Unit
-          )
+        ( ( do
+              socket1 <- unsafeFromRight "open failed" <$> Udp.open (Port 8888) { reuseaddr: true, active: Passive }
+              socket2 <- unsafeFromRight "open failed" <$> Udp.open (Port 0) {}
+              liftEffect
+                $ do
+                    _ <- Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
+                    recvData <- unsafeFromRight "recv failed" <$> Udp.recv socket1 InfiniteTimeout
+                    let
+                      payload = case recvData of
+                        Udp.Data _ _ p -> Just p
+                        Udp.DataAnc _ _ _ _ -> Nothing
+                    assertTrue $ payload == (Just $ toBinary "hello")
+          ) ::
+            ProcessM (Union |$| UdpMessage |+| Nil) Unit
+        )
+    test "passive socket test" do
+      socket1 <- unsafeFromRight "open failed" <$> Udp.openPassive (Port 8888) { reuseaddr: true }
+      socket2 <- unsafeFromRight "open failed" <$> Udp.openPassive (Port 0) {}
+      liftEffect do
+        _ <- Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
+        recvData <- unsafeFromRight "recv failed" <$> Udp.recv socket1 InfiniteTimeout
+        let
+          payload = case recvData of
+            Udp.Data _ _ p -> Just p
+            Udp.DataAnc _ _ _ _ -> Nothing
+        assertTrue $ payload == (Just $ toBinary "hello")
     test "passive message test via setopts" do
       unsafeRunProcessM
-        $ ( ( do
-                socket1 <- unsafeFromRight "open failed" <$> Udp.open (Port 8888) { reuseaddr: true }
-                socket2 <- unsafeFromRight "open failed" <$> Udp.open (Port 0) {}
-                liftEffect
-                  $ do
-                      _ <- unsafeFromRight "setopts failed" <$> Udp.setopts socket1 { active: Passive }
-                      _ <- Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
-                      recvData <- unsafeFromRight "recv failed" <$> Udp.recv socket1 InfiniteTimeout
-                      let
-                        payload = case recvData of
-                          Udp.Data _ _ p -> Just p
-                          Udp.DataAnc _ _ _ _ -> Nothing
-                      assertTrue $ payload == (Just $ toBinary "hello")
-            ) ::
-              ProcessM UdpMessage Unit
-          )
+        ( ( do
+              socket1 <- unsafeFromRight "open failed" <$> Udp.open (Port 8888) { reuseaddr: true }
+              socket2 <- unsafeFromRight "open failed" <$> Udp.open (Port 0) {}
+              liftEffect
+                $ do
+                    _ <- unsafeFromRight "setopts failed" <$> Udp.setopts socket1 { active: Passive }
+                    _ <- Udp.send socket2 (Host "localhost") (Port 8888) (fromBinary (toBinary "hello"))
+                    recvData <- unsafeFromRight "recv failed" <$> Udp.recv socket1 InfiniteTimeout
+                    let
+                      payload = case recvData of
+                        Udp.Data _ _ p -> Just p
+                        Udp.DataAnc _ _ _ _ -> Nothing
+                    assertTrue $ payload == (Just $ toBinary "hello")
+          ) ::
+            ProcessM (Union |$| UdpMessage |+| Nil) Unit
+        )
+  test "show binary short string" do
+    let
+      bin = toBinary "12345"
+      expected = "<<31 32 33 34 35>>"
+      actual = show bin
+    assertEqual { actual, expected }
 
 ipTests :: Free TestF Unit
 ipTests = do
@@ -206,10 +226,25 @@ ipTests = do
         expected = Just $ Ip4 $ Ip4Address ip4Addr
         actual = parseIpAddress validIp4Str
       assertEqual { actual, expected }
+    test "Can convert valid IPv4 address II" do
+      let
+        expected = Just $ Ip4Address ip4Addr
+        actual = parseIp4Address validIp4Str
+      assertEqual { actual, expected }
     test "Can convert valid IPv6 address" do
       let
-        expected =  Just $ Ip6 $ Ip6Address ip6Addr
+        expected = Just $ Ip6 $ Ip6Address ip6Addr
         actual = parseIpAddress validIp6Str
+      assertEqual { actual, expected }
+    test "Can convert valid IPv6 address II" do
+      let
+        expected = Just $ Ip6Address ip6Addr
+        actual = parseIp6Address validIp6Str
+      assertEqual { actual, expected }
+    test "Can convert IPv4 address to IPv6 format" do
+      let
+        expected = Just $ Ip6Address $ tuple8 (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 65535) (Hextet 31709) (Hextet 255)
+        actual = parseIp6Address validIp4Str
       assertEqual { actual, expected }
     test "Fails on invalid IPv4 address" do
       let
@@ -217,32 +252,80 @@ ipTests = do
         expected = Nothing
         actual = parseIpAddress ipStr
       assertEqual { actual, expected }
+    test "Fails on invalid IPv4 address II" do
+      let
+        ipStr = "123.221.0.256"
+        expected = Nothing
+        actual = parseIp4Address ipStr
+      assertEqual { actual, expected }
+    test "Fails on invalid IPv4 address III" do
+      let
+        expected = Nothing
+        actual = parseIp4Address validIp6Str
+      assertEqual { actual, expected }
     test "Fails on invalid IPv6 address" do
       let
         ipStr = "z001:db8:3333:4444:5555:6666:7777:8888"
         expected = Nothing
         actual = parseIpAddress ipStr
       assertEqual { actual, expected }
+    test "Fails on invalid IPv6 address II" do
+      let
+        ipStr = "123.221.0.256"
+        expected = Nothing
+        actual = parseIp6Address ipStr
+      assertEqual { actual, expected }
     test "Can build string from valid Ip4 address" do
       let
-        expected = Just validIp4Str
+        expected = validIp4Str
         actual = ntoa $ Ip4 $ Ip4Address ip4Addr
-      assertEqual {actual, expected}
+      assertEqual { actual, expected }
     test "Can build string from valid Ip6 address" do
       let
-        expected = Just validIp6Str
-        actual = ntoa $ Ip6  $ Ip6Address ip6Addr
-      assertEqual {actual, expected}
+        expected = validIp6Str
+        actual = ntoa $ Ip6 $ Ip6Address ip6Addr
+      assertEqual { actual, expected }
     test "Can build string from Ip4 tuple" do
       let
-        expected = Just validIp4Str
-        actual = ntoa4  $ Ip4Address ip4Addr
-      assertEqual {actual, expected}
+        expected = validIp4Str
+        actual = ntoa4 $ Ip4Address ip4Addr
+      assertEqual { actual, expected }
     test "Can build string from Ip6 tuple" do
       let
-        expected = Just validIp6Str
-        actual = ntoa6 $  Ip6Address ip6Addr
-      assertEqual {actual, expected}
+        expected = validIp6Str
+        actual = ntoa6 $ Ip6Address ip6Addr
+      assertEqual { actual, expected }
+    test "ip4Loopback helper is correct" do
+      let
+        expected = parseIp4Address "127.0.0.1"
+        actual = Just ip4Loopback
+      assertEqual { actual, expected }
+    test "ip6Loopback helper is correct" do
+      let
+        expected = parseIp6Address "::1"
+        actual = Just ip6Loopback
+      assertEqual { actual, expected }
+    test "ip4Any helper is correct" do
+      let
+        expected = parseIp4Address "0.0.0.0"
+        actual = Just ip4Any
+      assertEqual { actual, expected }
+    test "ip6Any helper is correct" do
+      let
+        expected = parseIp6Address "::"
+        actual = Just ip6Any
+      assertEqual { actual, expected }
+    test "Can construct ip4 addresses" do
+      let
+        expected = Just $ Ip4Address ip4Addr
+        actual = ip4 123 221 0 255
+      assertEqual { actual, expected }
+    test "Can construct ip6 addresses" do
+      let
+        expected = Just $ Ip6Address ip6Addr
+        actual = ip6 8193 3512 13107 17476 21845 26214 30583 34952
+      assertEqual { actual, expected }
+
   where
   validIp4Str = "123.221.0.255"
   ip4Addr = tuple4 (Octet 123) (Octet 221) (Octet 0) (Octet 255)
@@ -254,9 +337,3 @@ unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
 
 unsafeFromRight :: forall a b. String -> Either a b -> b
 unsafeFromRight s = fromRight' (\_ -> unsafeCrashWith s)
-
-ip4Loopback :: Ip4Address
-ip4Loopback = Ip4Address (tuple4 (Octet 127) (Octet 0) (Octet 0) (Octet 1))
-
-loopbackConnectAddress :: ConnectAddress
-loopbackConnectAddress = SocketAddr (IpAddress (Ip4 ip4Loopback))

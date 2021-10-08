@@ -1,65 +1,74 @@
 module Erl.Kernel.Inet
-  ( Port(..)
-  , Octet(..)
+  ( ActiveError(..)
+  , ActiveSocket
+  , AddressFamily(..)
+  , CommonOptions
   , ConnectAddress(..)
   , ConnectError(..)
-  , Hextet(..)
+  , ConnectedSocket
+  , HostAddress(..)
   , Hostname
-  , PosixError(..)
+  , InterfaceAddressRecord
+  , InterfaceAddresses(..)
+  , InterfaceFlags(..)
+  , InterfaceName
+  , InterfaceOptions(..)
   , Ip4Address(..)
   , Ip6Address(..)
   , IpAddress(..)
   , IpAddressUnion
-  , SocketAddress(..)
-  , HostAddress(..)
-  , LocalAddress
-  , AddressFamily(..)
-  , Raw(..)
-  , SocketActive(..)
-  , SocketMode(..)
-  , CommonOptions
-  , SocketType
   , ListenSocket
-  , ConnectedSocket
-  , SocketMessageBehaviour
-  , ActiveSocket
+  , LocalAddress
   , PassiveSocket
-  , InterfaceName
-  , InterfaceFlags(..)
-  , InterfaceAddresses(..)
-  , InterfaceAddressRecord
-  , InterfaceOptions(..)
+  , Port(..)
+  , PosixError(..)
+  , Raw(..)
+  , SendError(..)
+  , SocketActive(..)
+  , SocketAddress(..)
+  , SocketMessageBehaviour
+  , SocketMode(..)
+  , SocketType
+  , activeErrorToPurs
+  , class OptionToErl
+  , class OptionsToErl
   , class OptionsValid
   , class Socket
-  , send
-  , recv
   , close
-  , SendError(..)
-  , ActiveError(..)
-  , defaultCommonOptions
-  , sendErrorToPurs
   , connectErrorToPurs
-  , activeErrorToPurs
-  , posixErrorToPurs
-  , class OptionsToErl
-  , optionsToErl
+  , connectIp4Any
+  , connectIp4Loopback
+  , connectIp6Any
+  , connectIp6Loopback
+  , defaultCommonOptions
+  , getIfAddresses
+  , getIp4IfAddresses
+  , ip4
+  , ip4Any
+  , ip4Loopback
+  , ip6
+  , ip6Any
+  , ip6Loopback
+  , ipMulticastAll
+  , isMulticast
+  , macOsSoReusePort
   , makeTerms
-  , class OptionToErl
-  , optionToErl
-  , parseIpAddress
   , ntoa
   , ntoa4
   , ntoa6
-  , ipMulticastAll
-  , macOsSoReusePort
+  , optionToErl
+  , optionsToErl
+  , parseIp4Address
+  , parseIp6Address
+  , parseIpAddress
+  , posixErrorToPurs
+  , recv
+  , send
+  , sendErrorToPurs
   , windowsSoReuseAddr
-  , isMulticast
-  , getIfAddresses
-  , getIp4IfAddresses
   ) where
 
 import Prelude
-
 import Control.Bind (bindFlipped)
 import Data.Either (Either(..), hush)
 import Data.Foldable (foldl)
@@ -77,9 +86,9 @@ import Erl.Data.Binary (Binary)
 import Erl.Data.Binary.IOData (IOData)
 import Erl.Data.List (List, filterMap, nil, (:))
 import Erl.Data.Map (Map, lookup)
-import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4, uncurry4, uncurry8)
+import Erl.Data.Tuple (Tuple4, Tuple8, tuple2, tuple4, tuple8, uncurry4, uncurry8)
 import Erl.Kernel.File as File
-import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
+import Erl.Types (class ToErl, NonNegInt, Timeout, toErl, Octet(..), Hextet(..), hextet, octet)
 import Erl.Untagged.Union (class RuntimeType, type (|+|), Nil, RTInt, RTTuple4, RTTuple8, Union)
 import Foreign (Foreign, unsafeToForeign)
 import Prim.Row as Row
@@ -94,27 +103,11 @@ newtype Port
   = Port Int
 
 derive instance Eq Port
+derive instance Generic Port _
 instance Show Port where
-  show (Port port) = "port: " <> show port
+  show = genericShow
 derive instance Newtype Port _
 instance RuntimeType Port RTInt
-
-newtype Octet
-  = Octet Int
-derive instance Eq Octet
-instance Show Octet where
-  show (Octet octet) = "octet: " <> show octet
-derive instance Newtype Octet _
-instance RuntimeType Octet RTInt
-
-
-newtype Hextet
-  = Hextet Int
-derive instance Eq Hextet
-instance Show Hextet where
-  show (Hextet hextet) = "hextet: " <> show hextet
-derive instance Newtype Hextet _
-instance RuntimeType Hextet RTInt
 
 data SocketType
 
@@ -188,9 +181,9 @@ newtype Ip4Address
   = Ip4Address (Tuple4 Octet Octet Octet Octet)
 
 derive instance Eq Ip4Address
+derive instance Generic Ip4Address _
 instance Show Ip4Address where
-  show (Ip4Address ip4Address) = "ip4: " <> show ip4Address
-
+  show = genericShow
 derive instance Newtype Ip4Address _
 instance RuntimeType Ip4Address (RTTuple4 RTInt RTInt RTInt RTInt)
 
@@ -198,8 +191,9 @@ newtype Ip6Address
   = Ip6Address (Tuple8 Hextet Hextet Hextet Hextet Hextet Hextet Hextet Hextet)
 
 derive instance Eq Ip6Address
+derive instance Generic Ip6Address _
 instance Show Ip6Address where
-  show (Ip6Address ip6Address) = "ip6: " <> show ip6Address
+  show = genericShow
 derive instance Newtype Ip6Address _
 instance RuntimeType Ip6Address (RTTuple8 RTInt RTInt RTInt RTInt RTInt RTInt RTInt RTInt)
 
@@ -211,10 +205,9 @@ type IpAddressUnion
   = Union (Ip4Address |+| Ip6Address |+| Nil)
 
 derive instance Eq IpAddress
-
+derive instance Generic IpAddress _
 instance Show IpAddress where
-  show (Ip4 ip4Address) = show ip4Address
-  show (Ip6 ip6Address) = show ip6Address
+  show = genericShow
 
 isMulticast :: IpAddress -> Boolean
 isMulticast (Ip4 (Ip4Address addr)) = uncurry4 (\(Octet a) _b _c _d -> a .&. 0xf0 == 0xe0) addr
@@ -280,10 +273,10 @@ data HostAddress
   | Ip IpAddress
 
 derive instance Eq HostAddress
+derive instance Generic HostAddress _
 
 instance Show HostAddress where
-  show (Host hostName) = "Host " <> show hostName
-  show (Ip ipAddress) = "Ip" <> show ipAddress
+  show = genericShow
 
 data ConnectAddress
   = SocketAddr SocketAddress
@@ -455,12 +448,6 @@ instance ToErl SocketMode where
 instance ToErl Port where
   toErl (Port port) = toErl port
 
-instance ToErl Octet where
-  toErl (Octet octet) = toErl octet
-
-instance ToErl Hextet where
-  toErl (Hextet hextet) = toErl hextet
-
 instance ToErl Ip4Address where
   toErl (Ip4Address ipAddress) = toErl ipAddress
 
@@ -537,9 +524,41 @@ foreign import connectErrorToPursImpl :: (Foreign -> Maybe ConnectError) -> Fore
 ------------------------------------------------------------------------------
 -- FFI
 foreign import parseIpAddress :: String -> Maybe IpAddress
-foreign import ntoa4 :: Ip4Address -> Maybe String
-foreign import ntoa6 :: Ip6Address -> Maybe String
+foreign import parseIp4Address :: String -> Maybe Ip4Address
+foreign import parseIp6Address :: String -> Maybe Ip6Address
+foreign import ntoa4 :: Ip4Address -> String
+foreign import ntoa6 :: Ip6Address -> String
 ------------------------------------------------------------------------------
-ntoa :: IpAddress -> Maybe String
+ntoa :: IpAddress -> String
 ntoa (Ip4 addr) = ntoa4 addr
 ntoa (Ip6 addr) = ntoa6 addr
+
+ip4 :: Int -> Int -> Int -> Int -> Maybe Ip4Address
+ip4 i1 i2 i3 i4 = Ip4Address <$> (tuple4 <$> (octet i1) <*> (octet i2) <*> (octet i3) <*> (octet i4))
+
+ip6 :: Int -> Int -> Int -> Int -> Int -> Int -> Int -> Int -> Maybe Ip6Address
+ip6 i1 i2 i3 i4 i5 i6 i7 i8 = Ip6Address <$> (tuple8 <$> (hextet i1) <*> (hextet i2) <*> (hextet i3) <*> (hextet i4) <*> (hextet i5) <*> (hextet i6) <*> (hextet i7) <*> (hextet i8))
+
+ip4Loopback :: Ip4Address
+ip4Loopback = Ip4Address (tuple4 (Octet 127) (Octet 0) (Octet 0) (Octet 1))
+
+ip4Any :: Ip4Address
+ip4Any = Ip4Address (tuple4 (Octet 0) (Octet 0) (Octet 0) (Octet 0))
+
+ip6Loopback :: Ip6Address
+ip6Loopback = Ip6Address (tuple8 (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 1))
+
+ip6Any :: Ip6Address
+ip6Any = Ip6Address (tuple8 (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0) (Hextet 0))
+
+connectIp4Loopback :: ConnectAddress
+connectIp4Loopback = SocketAddr $ IpAddress $ Ip4 ip4Loopback
+
+connectIp4Any :: ConnectAddress
+connectIp4Any = SocketAddr $ IpAddress $ Ip4 ip4Any
+
+connectIp6Loopback :: ConnectAddress
+connectIp6Loopback = SocketAddr $ IpAddress $ Ip6 ip6Loopback
+
+connectIp6Any :: ConnectAddress
+connectIp6Any = SocketAddr $ IpAddress $ Ip6 ip6Any

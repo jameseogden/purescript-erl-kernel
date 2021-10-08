@@ -64,6 +64,9 @@ data UdpAncillary
   | Ttl Int
 
 derive instance eq_UdpAncillary :: Eq UdpAncillary
+derive instance Generic UdpAncillary _
+instance Show UdpAncillary where
+  show = genericShow
 
 data UdpMessage
   = Udp (UdpSocket ActiveSocket) IpAddressUnion Port Binary
@@ -71,10 +74,9 @@ data UdpMessage
   | Udp_passive (UdpSocket ActiveSocket)
 
 derive instance eq_UdpMessage :: Eq UdpMessage
-instance show_UdpMessage :: Show UdpMessage where
-  show (Udp socket ip port' _bin) = "udp-data: " <> show socket <> ", " <> show ip <> ", " <> show port' <> " / binary"
-  show (UdpAnc socket ip port' _anc _bin) = "udp-anc-data: " <> show socket <> ", " <> show ip <> ", " <> show port' <> " / binary"
-  show (Udp_passive socket) = "udp-passive: " <> show socket
+derive instance Generic UdpMessage _
+instance Show UdpMessage where
+  show = genericShow
 
 instance runtimeTypeUdpMessage ::
   RuntimeType
