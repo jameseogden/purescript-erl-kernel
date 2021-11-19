@@ -118,8 +118,6 @@ foreign import openImpl ::
   Effect (Either FileError FileHandle)
 
 foreign import readImpl ::
-  (FileError -> Either FileError Binary) ->
-  (Binary -> Either FileError Binary) ->
   FileHandle ->
   Int ->
   Effect (Either FileError Binary)
@@ -218,7 +216,7 @@ open ::
 open = openImpl Left Right defaultFileOpenOptions
 
 read :: FileHandle -> Int -> Effect (Either FileError Binary)
-read = readImpl Left Right
+read = readImpl
 
 close :: FileHandle -> Effect (Either FileError Unit)
 close = closeImpl Left (Right unit)

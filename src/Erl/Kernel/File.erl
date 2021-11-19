@@ -2,7 +2,8 @@
 
 -export([
          openImpl/3,
-         readImpl/4,
+         readImpl/2,
+         unsafeRead/2,
          readFileImpl/3,
          writeImpl/4,
          writeFileImpl/4,
@@ -90,8 +91,6 @@ openImpl(Left, Right, DefaultOptions) ->
 
                     Modes2 = [Mode || Mode <- Modes,
                                       Mode /= undefined],
-
-                  put(start, erlang:system_time(microsecond)),
                   case file:open(FileName, Modes2) of
                     {ok, Handle} -> Right(Handle);
                     {error, Err} -> Left(fileErrorToPurs(Err))
@@ -100,16 +99,19 @@ openImpl(Left, Right, DefaultOptions) ->
       end
   end.
 
-readImpl(Left, Right, Handle, Amount) ->
+readImpl(Handle, Amount) ->
   fun() ->
-      case file:read(Handle, Amount) of
-        {ok, Data} ->
-          Right(Data);
-        eof ->
-          Left(fileErrorToPurs(eof));
-        {error, Err} ->
-          Left(fileErrorToPurs(Err))
-      end
+      unsafeRead(Handle, Amount)
+  end.
+
+unsafeRead(Handle, Amount) ->
+  case file:read(Handle, Amount) of
+    {ok, Data} ->
+          {right, Data};
+    eof ->
+      {left, fileErrorToPurs(eof)};
+    {error, Err} ->
+      {left, fileErrorToPurs(Err)}
   end.
 
 readFileImpl(Left, Right, Filename) ->
@@ -144,8 +146,6 @@ writeFileImpl(Left, Right, FileName, Data) ->
 
 closeImpl(Left, Right, Handle) ->
   fun() ->
-      % End = erlang:system_time(microsecond),
-      % io:format(user, "Done ~p~n", [End - get(start)]),
       case file:close(Handle) of
         ok -> Right;
         {error, Err} ->
