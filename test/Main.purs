@@ -1,17 +1,20 @@
 module Test.Main where
 
 import Prelude
+
 import Control.Monad.Free (Free)
 import Data.Either (Either(..), fromRight')
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromMaybe')
+import Data.Maybe (Maybe(..), fromMaybe', isNothing)
 import Data.Show.Generic (genericShow)
 import Data.Time.Duration (Milliseconds(..))
 import Effect (Effect)
 import Effect.Class (liftEffect)
+import Erl.Atom (atom)
 import Erl.Data.Binary.IOData (fromBinary)
 import Erl.Data.Binary.UTF8 (toBinary)
 import Erl.Data.Tuple (tuple4, tuple8)
+import Erl.Kernel.Exceptions (ErrorType(..), error, exit, throw, try, tryError, tryExit, tryNamedError, tryThrown)
 import Erl.Kernel.Inet (ActiveError(..), HostAddress(..), Ip4Address(..), Ip6Address(..), IpAddress(..), Port(..), SocketActive(..), connectIp4Loopback, ip4, ip4Any, ip4Loopback, ip6, ip6Any, ip6Loopback, ntoa, ntoa4, ntoa6, parseIp4Address, parseIp6Address, parseIpAddress)
 import Erl.Kernel.Tcp (TcpMessage(..), setopts)
 import Erl.Kernel.Tcp as Tcp
@@ -21,8 +24,10 @@ import Erl.Process (Process, ProcessM, receive, self, spawnLink, unsafeRunProces
 import Erl.Test.EUnit (TestF, runTests, suite, test)
 import Erl.Types (Hextet(..), Octet(..), Timeout(..))
 import Erl.Untagged.Union (class RuntimeType, type (|$|), type (|+|), Nil, RTLiteralAtom, RTOption, RTTuple1, Union, inj, prj)
+import Foreign (unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
-import Test.Assert (assertEqual, assertTrue)
+import Test.Assert (assert', assertEqual, assertTrue)
+import Unsafe.Coerce (unsafeCoerce)
 
 main :: Effect Unit
 main =
@@ -31,6 +36,7 @@ main =
         tcpTests
         udpTests
         ipTests
+        exceptionTests
 
 data Msg
   = Ready
@@ -331,6 +337,53 @@ ipTests = do
   ip4Addr = tuple4 (Octet 123) (Octet 221) (Octet 0) (Octet 255)
   validIp6Str = "2001:db8:3333:4444:5555:6666:7777:8888"
   ip6Addr = tuple8 (Hextet 8193) (Hextet 3512) (Hextet 13107) (Hextet 17476) (Hextet 21845) (Hextet 26214) (Hextet 30583) (Hextet 34952)
+
+exceptionTests :: Free TestF Unit
+exceptionTests = do
+  suite "exception tests" do
+    test "try/throw" do
+      try (throw testValue) >>=
+        case _ of
+          Left { class: Throw, reason } | isMyError reason -> pure unit
+          _ -> assert' "not my error" false
+
+    test "try/error" do
+      try (error testValue) >>=
+        case _ of
+          Left { class: Error, reason } | isMyError reason -> pure unit
+          _ -> assert' "not my error" false
+
+    test "try/exit" do
+      try (exit testValue) >>=
+        case _ of
+          Left { class: Exit, reason } | isMyError reason -> pure unit
+          _ -> assert' "not my error" false
+
+    test "tryThrown" do
+      tryThrown (throw testValue) >>=
+        case _ of
+          Left reason | isMyError reason -> pure unit
+          _ -> assert' "not my error" false
+
+    test "tryError" do
+      tryError (error testValue) >>=
+        case _ of
+          Left reason | isMyError reason -> pure unit
+          _ -> assert' "not my error" false
+
+    test "tryExit" do
+      tryExit (exit testValue) >>=
+        case _ of
+          Left reason | isMyError reason -> pure unit
+          _ -> assert' "not my error" false
+
+    test "tryNamedError" do 
+      tryNamedError (atom "some_error") (error $ unsafeToForeign $ atom "some_error") >>=
+        assertTrue <<< isNothing
+
+  where
+  testValue = unsafeToForeign "my error"
+  isMyError reason = unsafeCoerce reason ==  "my error"
 
 unsafeFromJust :: forall a. String -> Maybe a -> a
 unsafeFromJust s = fromMaybe' (\_ -> unsafeCrashWith s)
