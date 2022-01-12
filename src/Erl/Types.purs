@@ -84,14 +84,23 @@ hextet i
 newtype MonotonicTime
   = MonotonicTime Int
 
+derive instance Eq MonotonicTime
+derive newtype instance Ord MonotonicTime
+
 newtype NativeTime
   = NativeTime Int
+
+derive instance Eq NativeTime
+derive newtype instance Ord NativeTime
 
 newtype TimeOffset
   = TimeOffset Int
 
 newtype StrictlyMonotonicInt
   = StrictlyMonotonicInt Int
+
+derive instance Eq StrictlyMonotonicInt
+derive newtype instance Ord StrictlyMonotonicInt
 
 newtype Second
   = Second Int
