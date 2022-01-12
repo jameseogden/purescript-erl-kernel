@@ -16,6 +16,7 @@ module Erl.Kernel.Erlang
   , currentTimeOffset
   , monotonicTimeToInstant
   , nativeTimeToMilliseconds
+  , node
   ) where
 
 import Prelude
@@ -87,3 +88,5 @@ foreign import strictlyMonotonicInt_ :: (Int -> StrictlyMonotonicInt) -> Effect 
 monotonicTimeToInstant :: MonotonicTime -> TimeOffset -> Maybe Instant
 monotonicTimeToInstant (MonotonicTime t) (TimeOffset o) =
   instant $ nativeTimeToMilliseconds $ NativeTime $ t + o
+
+foreign import node :: Effect Atom

@@ -15,6 +15,7 @@
         , strictlyMonotonicInt_/1
         , currentTimeOffset_/1
         , nativeTimeToMilliseconds_/2
+        , node/0
         ]).
 
 makeRef() ->
@@ -84,3 +85,5 @@ currentTimeOffset_(Ctor) ->
 
 nativeTimeToMilliseconds_(Time) ->
   erlang:convert_time_unit(Time, native, millisecond).
+
+node() -> fun() -> erlang:node() end.
