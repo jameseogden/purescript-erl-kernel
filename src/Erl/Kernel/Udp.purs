@@ -34,9 +34,8 @@ import Erl.Data.List (List)
 import Erl.Data.Tuple (Tuple2)
 import Erl.Kernel.File (FileName)
 import Erl.Kernel.Inet (class OptionsValid, AddressFamily, ActiveSocket, PassiveSocket, CommonOptions, HostAddress, IpAddress, IpAddressUnion, Port, PosixError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), defaultCommonOptions, optionsToErl, posixErrorToPurs)
-import Erl.Process (class ReceivesMessage)
 import Erl.Types (NonNegInt, Timeout, toErl)
-import Erl.Untagged.Union (class IsSupportedMessage, class RuntimeType, RTBinary, RTInt, RTLiteralAtom, RTLiteralAtomConvert, RTOption, RTTuple2, RTTuple5, RTTuple6, RTWildcard)
+import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTInt, RTLiteralAtom, RTLiteralAtomConvert, RTOption, RTTuple2, RTTuple5, RTTuple6, RTWildcard)
 import Foreign (Foreign)
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
@@ -222,18 +221,16 @@ else instance ConvertOption OptionToMaybe sym a (Maybe a) where
   convertOption _ _ val = Just val
 
 convertPassiveToActive ::
-  forall msg m.
+  forall m.
   MonadEffect m =>
-  ReceivesMessage m msg =>
-  IsSupportedMessage UdpMessage msg =>
+  CanReceiveMessage UdpMessage m =>
   UdpSocket PassiveSocket -> UdpSocket ActiveSocket
 convertPassiveToActive = unsafeCoerce
 
 open ::
-  forall options m msg.
+  forall options m.
   MonadEffect m =>
-  ReceivesMessage m msg =>
-  IsSupportedMessage UdpMessage msg =>
+  CanReceiveMessage UdpMessage m =>
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record OpenOptions) (Record (ForcedOptions options)) (Record (ForcedOptions OpenOptions)) =>

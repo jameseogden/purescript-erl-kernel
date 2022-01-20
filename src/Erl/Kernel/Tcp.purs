@@ -31,7 +31,6 @@ module Erl.Kernel.Tcp
   ) where
 
 import Prelude
-
 import ConvertableOptions (class ConvertOption, class ConvertOptionsWithDefaults, convertOptionsWithDefaults)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
@@ -47,9 +46,8 @@ import Erl.Data.List (List)
 import Erl.Data.Tuple (tuple2)
 import Erl.Kernel.File (FileName)
 import Erl.Kernel.Inet (class OptionsValid, class Socket, ActiveError, ActiveSocket, AddressFamily, CommonOptions, ConnectAddress, ConnectError, ConnectedSocket, ListenSocket, PassiveSocket, Port, PosixError, SendError, SocketActive(..), SocketAddress, SocketMessageBehaviour, SocketMode(..), SocketType, activeErrorToPurs, connectErrorToPurs, defaultCommonOptions, optionsToErl, posixErrorToPurs, sendErrorToPurs)
-import Erl.Process (class ReceivesMessage)
 import Erl.Types (class ToErl, NonNegInt, Timeout, toErl)
-import Erl.Untagged.Union (class IsSupportedMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
+import Erl.Untagged.Union (class CanReceiveMessage, class RuntimeType, RTBinary, RTLiteralAtom, RTOption, RTTuple2, RTTuple3, RTWildcard)
 import Foreign (Foreign, unsafeToForeign)
 import Partial.Unsafe (unsafeCrashWith)
 import Prim.Row as Row
@@ -310,18 +308,16 @@ else instance convertOption_OptionToMaybe2 :: ConvertOption OptionToMaybe sym a 
   convertOption _ _ val = Just val
 
 convertPassiveToActive ::
-  forall msg m.
+  forall m.
   MonadEffect m =>
-  ReceivesMessage m msg =>
-  IsSupportedMessage TcpMessage msg =>
+  CanReceiveMessage TcpMessage m =>
   TcpSocket PassiveSocket ConnectedSocket -> TcpSocket ActiveSocket ConnectedSocket
 convertPassiveToActive = unsafeCoerce
 
 accept ::
-  forall msg m.
+  forall m.
   MonadEffect m =>
-  ReceivesMessage m msg =>
-  IsSupportedMessage TcpMessage msg =>
+  CanReceiveMessage TcpMessage m =>
   TcpSocket ActiveSocket ListenSocket -> Timeout -> m (Either AcceptError (TcpSocket ActiveSocket ConnectedSocket))
 accept socket timeout = liftEffect $ acceptImpl (Left <<< fromMaybe' (\_ -> unsafeCrashWith "invalidError") <<< acceptErrorToPurs) Right socket (toErl timeout)
 
@@ -333,10 +329,9 @@ close :: forall socketMessageBehaviour socketType. TcpSocket socketMessageBehavi
 close = closeImpl
 
 connect ::
-  forall options msg m.
+  forall options m.
   MonadEffect m =>
-  ReceivesMessage m msg =>
-  IsSupportedMessage TcpMessage msg =>
+  CanReceiveMessage TcpMessage m =>
   Row.Union (ForcedOptions ()) options (ForcedOptions options) =>
   Row.Nub (ForcedOptions options) (ForcedOptions options) =>
   ConvertOptionsWithDefaults OptionToMaybe (Record ConnectOptions) (Record (ForcedOptions options)) (Record (ForcedOptions ConnectOptions)) =>
