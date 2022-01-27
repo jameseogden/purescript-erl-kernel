@@ -4,7 +4,7 @@ module Erl.Kernel.Tcp
   , ConnectOptions
   , ListenOptions
   , SocketPacket
-  , OptionToMaybe
+  , OptionToMaybe(..)
   , TcpSocket
   , TcpMessage(..)
   , Linger(..)
