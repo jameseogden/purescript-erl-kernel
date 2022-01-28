@@ -1,0 +1,32 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Cache Nix
+      id: cache-nix
+      uses: actions/cache@v2
+      with:
+        path: |
+          nix
+          ~/.nix-channels
+          ~/.nix-defexpr
+        key: ${{ runner.os }}-nix3
+
+    - name: Stage nix
+      if: steps.cache.outputs.cache-hit != 'true'
+      run: make nix
+
+    - name: Run test
+      run: make nix-test
